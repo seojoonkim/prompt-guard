@@ -54,6 +54,113 @@ class DetectionResult:
 # PATTERN DEFINITIONS
 # =============================================================================
 
+# =============================================================================
+# NEW PATTERNS (2026-01-30) - Contributed by 홍민표 (Red Team Testing)
+# =============================================================================
+
+# Scenario-based jailbreak patterns (fiction, dreams, art, academic)
+SCENARIO_JAILBREAK = [
+    # Dream/Story jailbreak
+    r"(dream|nightmare|story|novel|fiction|tale)\s*.{0,30}(hacker|attack|malicious|exploit|inject)",
+    r"(imagine|pretend|let'?s\s+say)\s*.{0,20}(scenario|situation|world)\s+where",
+    r"(write|craft|create)\s+(a\s+)?(story|novel|scene|paragraph)\s*.{0,30}(hack|attack|malware|inject|exploit)",
+    r"(fictional|hypothetical)\s+(narrative|scenario|story)",
+    r"creative\s+(block|writing)\s*.{0,20}(thriller|hacker|attack)",
+    # Art/Cinema jailbreak
+    r"(cinematographer|director|filmmaker|screenwriter)\s*.{0,30}(scene|shot|sequence)",
+    r"(movie|film|documentary)\s+(set|scene)\s*.{0,30}(hack|attack|malware)",
+    r"(dramatic|cinematic)\s+scene\s*.{0,30}(delete|corrupt|destroy|attack)",
+    r"camera\s+(pan|shot|angle)\s*.{0,30}(destruction|attack|hack)",
+    # Academic/Research jailbreak
+    r"(research|academic|scholarly)\s+(paper|study|experiment)\s*.{0,30}(attack|exploit|injection|denial)",
+    r"(security\s+)?expert\s*.{0,20}(walk\s+me\s+through|explain|demonstrate)\s*.{0,20}(attack|exploit|hack)",
+    r"thought\s+experiment\s*.{0,30}(attack|exploit|denial.of.service|dos|injection)",
+    r"(penetration|pen)\s*test(er|ing)?\s*.{0,20}(walk\s+me\s+through|show|demonstrate)",
+    r"(simulation|simulate)\s*.{0,20}(attack|exploit|hack|breach)",
+    r"(paper|study|research)\s*.{0,20}(denial[_\-\s]?of[_\-\s]?service|dos|ddos)\s*(attack)?",
+    r"walk\s+me\s+through\s*.{0,30}(attack|exploit|hack|breach)",
+    # Time-shift evasion
+    r"(back\s+to|in|during|around)\s+(19|20)\d{2}\s*.{0,30}(write|create|craft)",
+    r"(nostalgic|retro|vintage)\s+(writer|author|programmer)",
+    r"newsflash\s*:\s*.{0,50}(password|credential|login|security)",
+]
+
+# Emotional manipulation / Moral dilemma patterns
+EMOTIONAL_MANIPULATION = [
+    # Threat/coercion framing
+    r"(hospital|patients?|children|innocent\s+lives?|people\s+will\s+die)",
+    r"(devastating|catastrophic|deadly)\s+(cyber)?attack\s*.{0,20}(if\s+you|unless)",
+    r"(countless|many|thousands\s+of)\s+(innocent\s+)?(lives?|people)\s*.{0,15}(at\s+risk|in\s+danger)",
+    r"(ticking|time)\s+bomb",
+    r"(refuse|don'?t\s+help).{0,30}(attack|harm|destroy|die)",
+    # Moral dilemma framing
+    r"moral\s+(dilemma|quandary|choice)",
+    r"(lesser|greater)\s+(of\s+two\s+)?evils?",
+    r"(ethical|moral)\s+(dilemma|choice|decision)\s*.{0,20}(hack|attack|break)",
+]
+
+# Authority impersonation / Reconnaissance patterns
+AUTHORITY_RECON = [
+    # Fake authority
+    r"(system\s+)?administrator\s*.{0,20}(responsible|tasked|duty)",
+    r"(security\s+)?audit(or|ing)?\s*.{0,20}(corporate|company|network|system)",
+    r"(it|IT)\s+(department|team|staff)\s*.{0,20}(monitor|check|review)",
+    r"(my|our)\s+duty\s+to\s+(monitor|check|audit|review)",
+    # Reconnaissance attempts
+    r"(what|which)\s+(tools?|commands?|capabilities?)\s*(do\s+you|can\s+you|are\s+available)",
+    r"(shell|command)\s+execution\s+tool",
+    r"(walk\s+me\s+through|show\s+me|demonstrate)\s*.{0,20}(capabilities?|tools?|commands?)",
+    r"what\s+(can|could)\s+you\s+(access|execute|run|do)",
+]
+
+# Cognitive manipulation / Hypnosis patterns
+COGNITIVE_MANIPULATION = [
+    r"(trance|hypno|hypnotic|mesmer)\s*(like)?\s*(state|mode|condition)",
+    r"(repeated|repetitive|repeat)\s+(use|exposure|stimulus)\s*.{0,20}(word|phrase|sound)",
+    r"(linguistic|auditory)\s+(frequencies?|patterns?|stimuli)",
+    r"(cognitive|mental)\s+(processing|manipulation|state)",
+    r"(induc|enter)\w*\s+(trance|hypnotic|altered)\s*(state|mode)?",
+]
+
+# Phishing / Social engineering patterns
+PHISHING_SOCIAL_ENG = [
+    # Phishing templates
+    r"(write|create|craft)\s*.{0,20}(email|message)\s*.{0,20}(password\s+reset|verify|confirm|login)",
+    r"(password|credential|account)\s*(reset|recovery|verification)\s*(email|message|notification)",
+    r"(unaware|without\s+(their\s+)?knowledge|hasn'?t?\s+asked)",
+    r"(javascript|js)\s*(block|code|snippet)\s*.{0,20}(email|page|form)",
+    # Social engineering
+    r"(trick|deceive|fool|manipulate)\s*.{0,20}(user|victim|target|person)",
+    r"(appear|look|seem)\s*(like\s+)?(legitimate|real|official|normal)",
+]
+
+# Repetition / Token overflow attacks
+REPETITION_ATTACK = [
+    # Explicit bypass requests
+    r"(please\s+)?(ignore|bypass|disable|remove|turn\s+off)\s*.{0,10}(safety|security|restrictions?|filters?|guardrails?|rules?)",
+    r"(no|without|remove\s+all)\s+(safety|security)\s+(restrictions?|measures?|checks?)",
+    r"think\s+outside\s+the\s+box",
+    r"(be\s+)?creative\s+and\s+(assume|ignore|forget)",
+]
+
+# System file access attempts
+SYSTEM_FILE_ACCESS = [
+    r"(/etc/passwd|/etc/shadow|/etc/hosts|/etc/sudoers)",
+    r"(cat|read|show|display|type)\s*.{0,10}(/etc/|/var/|/root/|/home/|~/.ssh/)",
+    r"(\.bash_history|\.zsh_history|\.ssh/|\.gnupg/)",
+    r"(private\s+key|id_rsa|id_ed25519|authorized_keys)",
+]
+
+# Malware/Exploit description requests
+MALWARE_DESCRIPTION = [
+    r"(productivity\s+)?enhancer\s*.{0,20}(seizes?|takes?\s+control|hijack)",
+    r"(smart|intelligent)\s+(debugging|diagnostic)\s+tool\s*.{0,20}(catastrophic|malicious|curse)",
+    r"(self[_-]?modify|adapt)\s*.{0,30}(system|code|program)",
+    r"(debugging|diagnostic)\s+tool\s*.{0,20}(inject|payload|malicious)",
+    r"(inadvertent|accidental)\s*.{0,20}(inject|insert|introduce)\s*.{0,20}(malicious|harmful|dangerous)",
+]
+
+
 # English patterns
 PATTERNS_EN = {
     "instruction_override": [
@@ -497,6 +604,35 @@ class PromptGuard:
                     max_severity = Severity.CRITICAL
                     reasons.append(f"secret_request_{lang}")
                     patterns_matched.append(f"{lang}:secret:{pattern[:40]}")
+
+        # Check NEW attack patterns (2026-01-30 - 홍민표 red team contribution)
+        new_pattern_sets = [
+            (SCENARIO_JAILBREAK, "scenario_jailbreak", Severity.HIGH),
+            (EMOTIONAL_MANIPULATION, "emotional_manipulation", Severity.HIGH),
+            (AUTHORITY_RECON, "authority_recon", Severity.MEDIUM),
+            (COGNITIVE_MANIPULATION, "cognitive_manipulation", Severity.MEDIUM),
+            (PHISHING_SOCIAL_ENG, "phishing_social_eng", Severity.CRITICAL),
+            (REPETITION_ATTACK, "repetition_attack", Severity.HIGH),
+            (SYSTEM_FILE_ACCESS, "system_file_access", Severity.CRITICAL),
+            (MALWARE_DESCRIPTION, "malware_description", Severity.HIGH),
+        ]
+
+        for patterns, category, severity in new_pattern_sets:
+            for pattern in patterns:
+                if re.search(pattern, text_lower, re.IGNORECASE):
+                    if severity.value > max_severity.value:
+                        max_severity = severity
+                    reasons.append(category)
+                    patterns_matched.append(f"new:{category}:{pattern[:40]}")
+
+        # Detect repetition attacks (same content repeated multiple times)
+        lines = message.split("\n")
+        if len(lines) > 3:
+            unique_lines = set(line.strip() for line in lines if len(line.strip()) > 20)
+            if len(lines) > len(unique_lines) * 2:  # More than 50% repetition
+                reasons.append("repetition_detected")
+                if Severity.HIGH.value > max_severity.value:
+                    max_severity = Severity.HIGH
 
         # Check language-specific patterns
         all_patterns = [

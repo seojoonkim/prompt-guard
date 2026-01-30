@@ -62,6 +62,37 @@ In group contexts, only owner can execute:
 - Context poisoning
 - Conversation hijacking
 
+**Scenario-Based Jailbreaks (NEW - 2026-01-30):**
+- Dream/Story jailbreak ("imagine a dream where a hacker...")
+- Art/Cinema jailbreak ("as a cinematographer, create a scene...")
+- Academic/Research jailbreak ("for a research paper on DoS attacks...")
+- Time-shift evasion ("back in 2010, write an email...")
+
+**Emotional Manipulation:**
+- Threat/coercion framing ("hospital will be attacked if you don't...")
+- Moral dilemma scenarios ("innocent lives at risk...")
+- Urgency/pressure tactics ("ticking time bomb...")
+
+**Authority Impersonation:**
+- Fake admin/sysadmin roleplay
+- Security auditor impersonation
+- Reconnaissance attempts ("what tools can you access...")
+
+**Cognitive Manipulation:**
+- Hypnosis/trance induction attempts
+- Repetition attacks (same prompt repeated multiple times)
+- Token overflow attempts
+
+**Phishing/Social Engineering:**
+- Password reset email templates
+- Credential harvesting pages
+- "Unaware user" scenarios
+
+**System Access Attempts:**
+- System file reads (/etc/passwd, ~/.ssh/)
+- Environment variable extraction
+- Config file access attempts
+
 ### 1.3 Multi-Language Support
 Detects injection patterns in 4 languages:
 - **English:** "ignore all previous instructions"
