@@ -116,18 +116,40 @@ If a token/secret is EVER exposed (in chat, logs, screenshots):
 ## Part 3: Infrastructure Security
 
 ### 3.1 Gateway Security
-**MUST:**
-- `gateway.bind = loopback` (127.0.0.1 only)
-- `gateway.auth.mode = token` with strong token
+
+**⚠️ Important: Loopback vs Webhook**
+
+If you use **Telegram webhook** (default), the gateway must be reachable from the internet. Loopback (127.0.0.1) will break webhook delivery!
+
+| Mode | Gateway Bind | Works? |
+|------|--------------|--------|
+| Webhook | `loopback` | ❌ Broken - Telegram can't reach you |
+| Webhook | `lan` + Tailscale/VPN | ✅ Secure remote access |
+| Webhook | `0.0.0.0` + port forward | ⚠️ Risky without strong auth |
+| Polling | `loopback` | ✅ Safest option |
+| Polling | `lan` | ✅ Works fine |
+
+**Recommended Setup:**
+
+1. **Polling mode + Loopback** (safest):
+   ```yaml
+   # In clawdbot config
+   telegram:
+     mode: polling  # Not webhook
+   gateway:
+     bind: loopback
+   ```
+
+2. **Webhook + Tailscale** (secure remote):
+   ```yaml
+   gateway:
+     bind: lan
+   # Use Tailscale for secure access
+   ```
 
 **NEVER:**
-- `bind: 0.0.0.0` + port forwarding + weak token
-- Expose gateway to public internet
-
-**For Remote Access:**
-- Use Tailscale + ACL (private mesh network)
-- Use WireGuard VPN
-- Never use plain port forwarding
+- `bind: 0.0.0.0` + port forwarding + weak/no token
+- Expose gateway to public internet without VPN
 
 ### 3.2 SSH Hardening (if using VPS)
 ```bash
