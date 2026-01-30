@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/🚀_version-2.2.1-blue.svg?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/🚀_version-2.3.0-blue.svg?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/📅_updated-2025--01--30-brightgreen.svg?style=for-the-badge" alt="Updated">
   <img src="https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge" alt="License">
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/ClawdHub-v2.2.1-purple.svg" alt="ClawdHub">
+  <img src="https://img.shields.io/badge/ClawdHub-v2.3.0-purple.svg" alt="ClawdHub">
   <img src="https://img.shields.io/badge/languages-EN%20|%20KO%20|%20JA%20|%20ZH-orange.svg" alt="Languages">
   <img src="https://img.shields.io/badge/python-3.8+-blue.svg" alt="Python">
   <img src="https://img.shields.io/badge/clawdbot-compatible-blueviolet.svg" alt="Clawdbot">
@@ -24,7 +24,12 @@
 </p>
 
 <p align="center">
-  <code>📦 Latest: v2.2.1 | 📅 Updated: January 30, 2025 | 🔧 ClawdHub Ready</code>
+  <code>📦 Latest: v2.3.0 | 📅 Updated: January 30, 2025 | 🔧 ClawdHub Ready</code>
+</p>
+
+<p align="center">
+  <i>The essential security layer for <a href="https://github.com/clawdbot/clawdbot">Clawdbot</a> and <a href="https://github.com/moltbot/moltbot">Moltbot</a> AI agents.<br>
+  Defend against prompt injection, protect secrets, and secure your LLM-powered assistant.</i>
 </p>
 
 ---
@@ -419,14 +424,20 @@ python3 scripts/audit.py --verbose
 chmod 700 ~/.clawdbot
 chmod 600 ~/.clawdbot/clawdbot.json
 
-# Gateway (Clawdbot)
-gateway.bind = loopback  # Never 0.0.0.0
-gateway.auth.mode = token
-
 # SSH (if using VPS)
 PasswordAuthentication no
 PermitRootLogin no
 ```
+
+### Gateway Security (⚠️ Important)
+
+| Mode | Gateway Bind | Works? |
+|------|--------------|--------|
+| Webhook | `loopback` | ❌ Broken - Telegram can't reach you |
+| Webhook | `lan` + Tailscale/VPN | ✅ Secure remote access |
+| Polling | `loopback` | ✅ Safest option |
+
+**Recommended:** Use polling mode + loopback, or webhook + Tailscale.
 
 ### The Golden Rules
 
@@ -434,7 +445,7 @@ PermitRootLogin no
 |------|-----|
 | 🔒 Secrets never go in chat | Once exposed, assume compromised |
 | 🔄 Exposed = Rotate | Any leaked token must be replaced |
-| 🏠 Loopback only | Never expose gateway to internet |
+| 🏠 Secure gateway | Loopback (polling) or VPN (webhook) |
 | 👤 Allowlist groups | Don't let strangers command your bot |
 | 📝 Log everything | You can't fix what you can't see |
 
@@ -487,7 +498,13 @@ Contributions are welcome! Feel free to:
 
 ## 📋 Changelog
 
-### v2.2.1 (January 30, 2025) — Latest ⭐
+### v2.3.0 (January 30, 2025) — Latest ⭐
+- 🔧 **Gateway Security Fix**: Clarified loopback vs webhook mode
+  - Loopback breaks Telegram webhook (use polling mode instead)
+  - Added compatibility table for gateway configurations
+- 📖 **Documentation**: Updated infrastructure security guide
+
+### v2.2.1 (January 30, 2025)
 - 📖 **Enhanced Documentation**: Comprehensive threat scenarios and attack examples
 - 🏷️ **Version Badges**: Clear version and update date display
 - 📦 **ClawdHub Integration**: Easy installation via `clawdhub install prompt-guard`
