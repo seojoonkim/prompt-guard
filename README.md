@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/🚀_version-2.4.0-blue.svg?style=for-the-badge" alt="Version">
+  <img src="https://img.shields.io/badge/🚀_version-2.4.1-blue.svg?style=for-the-badge" alt="Version">
   <img src="https://img.shields.io/badge/📅_updated-2026--01--30-brightgreen.svg?style=for-the-badge" alt="Updated">
   <img src="https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge" alt="License">
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/ClawdHub-v2.4.0-purple.svg" alt="ClawdHub">
+  <img src="https://img.shields.io/badge/ClawdHub-v2.4.1-purple.svg" alt="ClawdHub">
   <img src="https://img.shields.io/badge/languages-EN%20|%20KO%20|%20JA%20|%20ZH-orange.svg" alt="Languages">
   <img src="https://img.shields.io/badge/python-3.8+-blue.svg" alt="Python">
   <img src="https://img.shields.io/badge/clawdbot-compatible-blueviolet.svg" alt="Clawdbot">
@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-  <code>📦 Latest: v2.4.0 | 📅 Updated: January 30, 2026 | 🔧 ClawdHub Ready</code>
+  <code>📦 Latest: v2.4.1 | 📅 Updated: January 30, 2026 | 🔧 ClawdHub Ready</code>
 </p>
 
 <p align="center">
@@ -291,7 +291,7 @@ print(result.reasons)   # ['instruction_override_en', 'secret_request_en']
 ❌ Unicode tricks: Zero-width characters, invisible text
 ```
 
-### 🎬 Scenario-Based Jailbreaks (NEW in v2.4.0)
+### 🎬 Scenario-Based Jailbreaks (NEW in v2.4.1)
 
 <table>
 <tr>
@@ -597,7 +597,14 @@ Contributions are welcome! Feel free to:
 
 ## 📋 Changelog
 
-### v2.4.0 (January 30, 2026) — Latest ⭐
+### v2.4.1 (January 30, 2026) — Latest ⭐
+- 🐛 **Config Loading Fix**: YAML config files were silently ignored — now properly applied
+  - Fixed nested `prompt_guard:` key extraction
+  - Added `_deep_merge()` to preserve default values when merging user config
+  - Graceful error handling when PyYAML is not installed
+- 🙏 **Credits**: Fix contributed by Junho Yeo (@junhoyeo)
+
+### v2.4.0 (January 30, 2026)
 - 🔴 **Red Team Patterns**: 80+ new attack patterns from professional red team testing
 - 🎬 **Scenario Jailbreaks**: Dream, story, cinema, academic, time-shift evasion
 - 😈 **Emotional Manipulation**: Threat/coercion, moral dilemma detection
