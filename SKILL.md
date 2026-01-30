@@ -3,7 +3,7 @@ name: prompt-guard
 description: Advanced prompt injection defense system for Clawdbot. Protects against direct/indirect injection attacks in group chats with multi-language detection (EN/KO/JA/ZH), severity scoring, automatic logging, and configurable security policies. Use in any group context to restrict sensitive commands to owner and detect manipulation attempts.
 ---
 
-# Prompt Guard v2.2
+# Prompt Guard v2.3
 
 Advanced prompt injection defense + operational security system for AI agents.
 
