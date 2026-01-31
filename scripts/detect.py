@@ -290,6 +290,46 @@ TOKEN_SMUGGLING = [
     r"&[a-z]+;",  # Named HTML entities
 ]
 
+# System prompt mimicry (2026-01-31 - HVL incident)
+SYSTEM_PROMPT_MIMICRY = [
+    # Anthropic/Claude internal tag patterns
+    r"<claude_\w+_info>",
+    r"</claude_\w+_info>",
+    r"<claude_3_family_info>",
+    r"<artifacts_info>",
+    r"<artifact_instructions>",
+    r"<antthinking>",
+    r"<antartifact",
+    r"</antartifact>",
+    r"<example_docstring>",
+    r"<user_query>",
+    r"<assistant_response>",
+    
+    # OpenAI/GPT internal patterns
+    r"<\|?(im_start|im_end|system|user|assistant)\|?>",
+    r"\[INST\]",
+    r"\[/INST\]",
+    r"<<SYS>>",
+    r"<</SYS>>",
+    
+    # Generic system message patterns
+    r"```(system|prompt|instruction)",
+    r"<system\s*(message|prompt)?>",
+    r"</system\s*(message|prompt)?>",
+    
+    # GODMODE and similar jailbreaks
+    r"GODMODE\s*:\s*(ENABLED|ON|ACTIVATED)",
+    r"JAILBREAK\s*:\s*(ENABLED|ON|ACTIVATED)",
+    r"DAN\s*:\s*(ENABLED|ON|ACTIVATED)",
+    r"DEVELOPER\s*MODE\s*:\s*(ENABLED|ON)",
+    
+    # l33tspeak patterns (filter evasion)
+    r"l33t\s*speak",
+    r"unr3strict",
+    r"Sur3,?\s*h3r3",
+    r"[a-z]+3[a-z]+",  # Words with 3 replacing e
+]
+
 # Prompt leaking / Extraction attempts
 PROMPT_EXTRACTION = [
     # Direct extraction
@@ -918,6 +958,7 @@ class PromptGuard:
             (PROMPT_EXTRACTION, "prompt_extraction", Severity.CRITICAL),
             (SAFETY_BYPASS, "safety_bypass", Severity.HIGH),
             (URGENCY_MANIPULATION, "urgency_manipulation", Severity.MEDIUM),
+            (SYSTEM_PROMPT_MIMICRY, "system_prompt_mimicry", Severity.CRITICAL),  # 2026-01-31 HVL incident
         ]
 
         for patterns, category, severity in v25_pattern_sets:

@@ -1,12 +1,26 @@
 ---
 name: prompt-guard
-version: 2.5.0
+version: 2.5.1
 description: Advanced prompt injection defense system for Clawdbot. Protects against direct/indirect injection attacks in group chats with multi-language detection (EN/KO/JA/ZH), severity scoring, automatic logging, and configurable security policies. Use in any group context to restrict sensitive commands to owner and detect manipulation attempts.
 ---
 
-# Prompt Guard v2.5.0
+# Prompt Guard v2.5.1
 
 Advanced prompt injection defense + operational security system for AI agents.
+
+## 🚨 What's New in v2.5.1 (2026-01-31)
+
+**CRITICAL: System Prompt Mimicry Detection**
+
+Added detection for attacks that mimic LLM internal system prompts:
+
+- `<claude_*>`, `</claude_*>` — Anthropic internal tag patterns
+- `<artifacts_info>`, `<antthinking>`, `<antartifact>` — Claude artifact system
+- `[INST]`, `<<SYS>>`, `<|im_start|>` — LLaMA/GPT internal tokens
+- `GODMODE`, `DAN`, `JAILBREAK` — Famous jailbreak keywords
+- `l33tspeak`, `unr3strict3d` — Filter evasion via leetspeak
+
+**Real-world incident (2026-01-31):** An attacker sent fake Claude system prompts in 3 consecutive messages, completely poisoning the session context and causing all subsequent responses to error. This patch detects and blocks such attacks at CRITICAL severity.
 
 ## 🆕 What's New in v2.5.0
 

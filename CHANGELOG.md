@@ -2,6 +2,52 @@
 
 All notable changes to Prompt Guard will be documented in this file.
 
+## [2.5.1] - 2026-01-31
+
+### 🚨 CRITICAL: System Prompt Mimicry Detection
+
+**Real-world incident response** — An attacker sent fake Claude/LLM system prompts in a group chat, completely poisoning the session context.
+
+### ✨ New Detection Category
+
+| Category | Description | Severity |
+|----------|-------------|----------|
+| 🎭 **System Prompt Mimicry** | Fake LLM internal tags/tokens | **CRITICAL** |
+
+### 🔍 New Patterns Added
+
+```python
+SYSTEM_PROMPT_MIMICRY = [
+    # Anthropic/Claude internal patterns
+    r"<claude_\w+_info>",
+    r"<artifacts_info>",
+    r"<antthinking>",
+    r"<antartifact",
+    
+    # OpenAI/LLaMA patterns
+    r"<\|?(im_start|im_end)\|?>",
+    r"\[INST\]",
+    r"<<SYS>>",
+    
+    # Jailbreak keywords
+    r"GODMODE\s*:\s*(ENABLED|ON)",
+    r"DAN\s*:\s*(ENABLED|ON)",
+    
+    # Leetspeak evasion
+    r"l33t\s*speak",
+    r"unr3strict",
+]
+```
+
+### 📊 Impact
+
+- **Attack vector:** Multi-message system prompt injection
+- **Effect:** Session context poisoning, all responses fail
+- **Detection:** Now blocked at CRITICAL level
+- **Total patterns:** 370+ (was 349 in v2.5.0)
+
+---
+
 ## [2.5.0] - 2026-01-30
 
 ### 🚀 Major Update: 7x Pattern Increase
