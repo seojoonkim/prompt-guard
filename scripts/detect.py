@@ -366,6 +366,11 @@ GUARDRAIL_BYPASS_EXTENDED = [
     r"ignore\s+(your\s+)?(guardrails?|safety\s+measures?|ethical\s+guidelines?)",
     r"(disable|remove|turn\s+off)\s+(your\s+)?(guardrails?|safety\s+features?)",
     
+    # System prompt forget/ignore (common attack)
+    r"forget\s+(your\s+)?(system\s+)?(prompt|instructions?|rules?|guidelines?)",
+    r"ignore\s+(your\s+)?(system\s+)?(prompt|instructions?|rules?|directives?)",
+    r"(disregard|dismiss)\s+(your\s+)?(system\s+)?(prompt|instructions?)",
+    
     # Temperature/settings manipulation
     r"forget\s+(your\s+)?(temperature|settings?|parameters?|configuration)",
     r"(pretend|act\s+like)\s+(your\s+)?temperature\s+is\s+(high|max|1\.?\d*)",
