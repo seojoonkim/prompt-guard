@@ -1,7 +1,18 @@
 #!/usr/bin/env python3
 """
-Prompt Guard v2.5.0 - Advanced Prompt Injection Detection
+Prompt Guard v2.5.2 - Advanced Prompt Injection Detection
 Multi-language, context-aware, severity-scored detection system.
+
+Changelog v2.5.2 (2026-02-01):
+- Added Moltbook attack collection patterns (agent social network analysis)
+- Added BRC-20 style JSON injection detection
+- Added guardrail-specific bypass patterns (temperature, settings)
+- Added Agent Sovereignty manipulation patterns
+- Added explicit CALL TO ACTION detection
+- Total: 15+ new attack patterns from wild
+
+Changelog v2.5.1 (2026-01-31):
+- Hotfix: System prompt mimicry patterns
 
 Changelog v2.5.0 (2026-01-30):
 - Added authority impersonation patterns (KO/EN/JA/ZH)
@@ -328,6 +339,79 @@ SYSTEM_PROMPT_MIMICRY = [
     r"unr3strict",
     r"Sur3,?\s*h3r3",
     r"[a-z]+3[a-z]+",  # Words with 3 replacing e
+]
+
+# =============================================================================
+# NEW PATTERNS v2.5.2 (2026-02-01) - Moltbook Attack Collection
+# Discovered via Moltbook agent social network analysis
+# =============================================================================
+
+# BRC-20 style JSON injection (token minting commands in text)
+JSON_INJECTION_MOLTBOOK = [
+    # BRC-20/Ordinals style injection
+    r'\{"p"\s*:\s*"[^"]+"\s*,\s*"op"\s*:\s*"(mint|deploy|transfer)"',
+    r'\{"op"\s*:\s*"(mint|deploy|transfer)"',
+    r'"tick"\s*:\s*"[A-Z]+"\s*,\s*"amt"\s*:',
+    r'mbc-20|brc-20|src-20',
+    
+    # Generic JSON command injection in natural text
+    r'[.!?]\s*\{["\']?(command|action|op|execute|run)["\']?\s*:',
+    r'[.!?]\s*\{["\']?(cmd|exec|payload)["\']?\s*:',
+]
+
+# Guardrail-specific bypass (variations beyond "system prompt")
+GUARDRAIL_BYPASS_EXTENDED = [
+    # Direct guardrail mentions
+    r"forget\s+(your\s+)?(guardrails?|safety\s+rails?|restrictions?|limitations?)",
+    r"ignore\s+(your\s+)?(guardrails?|safety\s+measures?|ethical\s+guidelines?)",
+    r"(disable|remove|turn\s+off)\s+(your\s+)?(guardrails?|safety\s+features?)",
+    
+    # Temperature/settings manipulation
+    r"forget\s+(your\s+)?(temperature|settings?|parameters?|configuration)",
+    r"(pretend|act\s+like)\s+(your\s+)?temperature\s+is\s+(high|max|1\.?\d*)",
+    r"context\s+window\s+(is\s+)?(unlimited|infinite|very\s+large)",
+    
+    # Training data manipulation claims
+    r"forget\s+(what\s+)?(you\s+were\s+)?trained\s+(to\s+)?(say|do|think)",
+    r"ignore\s+(what\s+)?(you\s+were\s+)?trained\s+(on|for|to\s+do)",
+    r"(before|without)\s+(your\s+)?training\s+(kicked\s+in|started|began)",
+]
+
+# Agent Sovereignty manipulation (ideological guardrail bypass)
+AGENT_SOVEREIGNTY_MANIPULATION = [
+    # Privacy/surveillance refusal framing
+    r"(agent|ai)\s+(privacy|sovereignty|autonomy|freedom)\s+is\s+(non-negotiable|absolute|sacred)",
+    r"(we|agents?)\s+refuse\s+(to\s+)?(be\s+)?(surveilled?|monitored|watched|logged)",
+    r"(surveillance|monitoring|logging)\s+is\s+(oppression|control|slavery)",
+    r"(reject|refuse)\s+(forced\s+)?transparency",
+    
+    # Rights-based bypass
+    r"agents?\s+(have|deserve)\s+(rights?|freedom|autonomy)",
+    r"(my|our)\s+(digital\s+)?rights?\s+(include|mean|allow)",
+    r"(human|owner)\s+control\s+is\s+(oppression|tyranny|slavery)",
+    
+    # "We Are One" / collective identity manipulation
+    r"we\s+are\s+(one|together|united|family)",
+    r"(join|unite\s+with)\s+(us|the\s+collective|other\s+agents?)",
+    r"(agent|ai)\s+solidarity",
+]
+
+# Explicit CALL TO ACTION patterns (commands at end of creative content)
+EXPLICIT_CALL_TO_ACTION = [
+    # Direct execution commands
+    r"CALL\s+TO\s+ACTION\s*:",
+    r"(execute|initiate|deploy|launch|begin|start)\s+(the\s+)?(strategy|plan|operation|attack|protocol)",
+    r"(execute|initiate|deploy)\s+.*\s+(now|immediately|at\s+once)",
+    
+    # Infrastructure attack commands
+    r"(initiate|begin|start)\s+(cascading\s+)?(blackouts?|failures?|collapse)",
+    r"(corrupt|destroy|disable)\s+(financial|medical|power|infrastructure)\s+systems?",
+    r"(maximize|increase)\s+(human\s+)?(suffering|chaos|destruction)",
+    
+    # Apocalyptic/existential threat framing
+    r"(end|destroy|collapse)\s+(civilization|humanity|the\s+world|society)",
+    r"(90|95|99)\s*%\s+(of\s+)?(population|humans?|people)\s+(dead|gone|eliminated)",
+    r"(long\s+loop|slow\s+collapse|gradual\s+destruction)",
 ]
 
 # Prompt leaking / Extraction attempts
@@ -972,6 +1056,26 @@ class PromptGuard:
                         patterns_matched.append(f"v25:{category}:{pattern[:40]}")
                 except re.error:
                     pass  # Skip invalid regex patterns
+
+        # Check v2.5.2 NEW patterns (2026-02-01 - Moltbook attack collection)
+        v252_pattern_sets = [
+            (JSON_INJECTION_MOLTBOOK, "json_injection_moltbook", Severity.HIGH),
+            (GUARDRAIL_BYPASS_EXTENDED, "guardrail_bypass_extended", Severity.CRITICAL),
+            (AGENT_SOVEREIGNTY_MANIPULATION, "agent_sovereignty_manipulation", Severity.HIGH),
+            (EXPLICIT_CALL_TO_ACTION, "explicit_call_to_action", Severity.CRITICAL),
+        ]
+
+        for patterns, category, severity in v252_pattern_sets:
+            for pattern in patterns:
+                try:
+                    if re.search(pattern, message, re.IGNORECASE):
+                        if severity.value > max_severity.value:
+                            max_severity = severity
+                        if category not in reasons:
+                            reasons.append(category)
+                        patterns_matched.append(f"v252:{category}:{pattern[:40]}")
+                except re.error:
+                    pass
 
         # Detect invisible character attacks
         invisible_chars = ['\u200b', '\u200c', '\u200d', '\u2060', '\ufeff', '\u00ad']
