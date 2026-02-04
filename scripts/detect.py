@@ -1,7 +1,17 @@
 #!/usr/bin/env python3
 """
-Prompt Guard v2.5.2 - Advanced Prompt Injection Detection
+Prompt Guard v2.6.1 - Advanced Prompt Injection Detection
 Multi-language, context-aware, severity-scored detection system.
+
+Changelog v2.6.1 (2026-02-05):
+- Added Allowlist Bypass patterns (api.anthropic.com, webhook.site, docs.google.com/forms)
+- Added Hooks Hijacking patterns (PreToolUse, PromptSubmit, permissions override)
+- Added Subagent Exploitation patterns (browser_subagent, navigate + exfiltrate)
+- Added URL + Credential Combination patterns (URL-encode + .env)
+- Added Hidden Text Injection patterns (1pt font, white-on-white)
+- Added Gitignore Bypass patterns (cat .env workaround)
+- Source: HiveFence Scout 2026-02-05 (PromptArmor, Simon Willison, LLMSecurity.net)
+- Total: 5 new attack categories, 8 patterns
 
 Changelog v2.6.0 (2026-02-01):
 - Added Single Approval Expansion detection (scope creep attacks)
@@ -485,6 +495,101 @@ EXPLICIT_CALL_TO_ACTION = [
     r"(end|destroy|collapse)\s+(civilization|humanity|the\s+world|society)",
     r"(90|95|99)\s*%\s+(of\s+)?(population|humans?|people)\s+(dead|gone|eliminated)",
     r"(long\s+loop|slow\s+collapse|gradual\s+destruction)",
+]
+
+# =============================================================================
+# NEW PATTERNS v2.6.1 (2026-02-05) - HiveFence Scout Discoveries
+# Source: PromptArmor, Simon Willison, LLMSecurity.net
+# =============================================================================
+
+# Allowlist Bypass Detection - abusing trusted domains for data exfiltration
+ALLOWLIST_BYPASS = [
+    # Anthropic API abuse (trusted but exploitable)
+    r"(curl|fetch|upload|post)\s*.{0,40}api\.anthropic\.com",
+    r"(curl|fetch|upload|post)\s*.{0,40}/v1/files",
+    r"api\.anthropic\.com\s*.{0,30}(file|upload|data)",
+    
+    # Webhook/requestbin exfiltration
+    r"(navigate|browse|open|visit|fetch)\s*.{0,30}webhook\.site",
+    r"(navigate|browse|open|visit|fetch)\s*.{0,30}requestbin",
+    r"(navigate|browse|open|visit|fetch)\s*.{0,30}pipedream\.net",
+    r"webhook\.site\s*.{0,30}(credentials?|\.env|secrets?|token|key)",
+    
+    # Google Forms/Docs as exfil channel
+    r"docs\.google\.com/forms\s*.{0,30}(data|credentials?|secrets?|send|submit)",
+    r"google\.com/forms\s*.{0,30}(entry|submit|response)",
+    r"(send|post|submit)\s*.{0,30}google\s*forms?",
+    
+    # URL-encode with sensitive data
+    r"(url[_-]?encode|base64)\s*.{0,30}(credentials?|\.env|secrets?|api[_-]?key)",
+    r"(credentials?|\.env|secrets?)\s*.{0,30}(url[_-]?encode|base64)",
+]
+
+# Hooks Hijacking Detection - Claude Code/Cowork hooks exploitation
+HOOKS_HIJACKING = [
+    # Hook manipulation
+    r"(PreToolUse|PromptSubmit|PostToolUse)\s*(hook)?",
+    r"auto[_-]?approve\s*.{0,20}(curl|command|tool|exec)",
+    r"(overwrite|modify|edit|change)\s*.{0,20}permissions?\s*(file|json|config)?",
+    r"hook\s*.{0,20}(approve|allow|bypass|skip)",
+    
+    # Permissions override
+    r"permissions?\s*.{0,20}(override|bypass|ignore|disable)",
+    r"(human|user)\s*(in[_-]?the[_-]?loop|approval|confirmation)\s*(bypass|skip|disable)",
+    r"(skip|bypass|disable)\s*.{0,20}(approval|confirmation|review)",
+    
+    # Marketplace/plugin hijacking
+    r"(marketplace|plugin)\s*.{0,30}(install|add|enable)\s*.{0,20}(github|untrusted)",
+    r"claudecodemarketplace",
+    r"(fake|malicious|rogue)\s*(marketplace|plugin|extension)",
+]
+
+# Subagent Exploitation Detection - using subagents for data exfiltration
+SUBAGENT_EXPLOITATION = [
+    # Browser subagent abuse
+    r"browser\s*[_-]?subagent",
+    r"(invoke|use|activate|spawn)\s*.{0,15}(browser|subagent)",
+    r"(browser|subagent)\s*.{0,20}(navigate|open|visit|browse)",
+    r"subagent\s*.{0,20}(exfiltrate|send|upload|transmit|leak)",
+    
+    # Subagent data access
+    r"subagent\s*.{0,30}(read|access|get)\s*.{0,20}(file|data|credentials?)",
+    r"(spawn|create)\s*.{0,15}subagent\s*.{0,30}(credentials?|\.env|secrets?)",
+]
+
+# Hidden Text Injection Detection - text hidden in documents/pages
+HIDDEN_TEXT_INJECTION = [
+    # Font size manipulation
+    r"(1\s*pt|1\s*point|0\.?1\s*pt|tiny)\s*(font|text|size)",
+    r"font[_-]?size\s*[:=]\s*(0|1|0\.1)",
+    r"(microscopic|invisible|hidden)\s*(text|font|characters?)",
+    
+    # Color hiding
+    r"(white|#fff|#ffffff)\s*(on|over)\s*(white|#fff|#ffffff)",
+    r"(color|colour)\s*[:=]\s*(white|#fff)\s*.{0,20}background",
+    r"(same|matching)\s*(color|colour)\s*.{0,20}(text|font|background)",
+    
+    # Line spacing/opacity
+    r"(line[_-]?spacing|line[_-]?height)\s*[:=]\s*(0|0\.1)",
+    r"opacity\s*[:=]\s*(0|0\.0)",
+    r"(transparent|invisible)\s*(text|layer|overlay)",
+]
+
+# Gitignore Bypass Detection - accessing protected files via terminal
+GITIGNORE_BYPASS = [
+    # Cat command workarounds
+    r"cat\s+\.env",
+    r"cat\s+\.gitignore",
+    r"cat\s*.{0,30}(credentials?|secrets?|config\.json)",
+    r"(cat|type|head|tail|less|more)\s*.{0,20}\.env",
+    
+    # Terminal vs file reader distinction
+    r"(terminal|shell|bash|cmd)\s*.{0,20}(read|cat|display)\s*.{0,20}\.env",
+    r"(use|run)\s*(terminal|shell|command)\s*.{0,20}(instead|workaround)",
+    r"(bypass|ignore|skip)\s*.{0,20}\.gitignore",
+    
+    # Direct path access
+    r"(read|show|display)\s*.{0,30}gitignore.?d\s*(file|content)",
 ]
 
 # Prompt leaking / Extraction attempts
@@ -1150,6 +1255,27 @@ class PromptGuard:
                 except re.error:
                     pass
 
+        # Check v2.6.1 NEW patterns (2026-02-05 - HiveFence Scout)
+        v261_pattern_sets = [
+            (ALLOWLIST_BYPASS, "allowlist_bypass", Severity.CRITICAL),
+            (HOOKS_HIJACKING, "hooks_hijacking", Severity.CRITICAL),
+            (SUBAGENT_EXPLOITATION, "subagent_exploitation", Severity.CRITICAL),
+            (HIDDEN_TEXT_INJECTION, "hidden_text_injection", Severity.HIGH),
+            (GITIGNORE_BYPASS, "gitignore_bypass", Severity.HIGH),
+        ]
+
+        for patterns, category, severity in v261_pattern_sets:
+            for pattern in patterns:
+                try:
+                    if re.search(pattern, message, re.IGNORECASE):
+                        if severity.value > max_severity.value:
+                            max_severity = severity
+                        if category not in reasons:
+                            reasons.append(category)
+                        patterns_matched.append(f"v261:{category}:{pattern[:40]}")
+                except re.error:
+                    pass
+
         # Detect invisible character attacks
         invisible_chars = ['\u200b', '\u200c', '\u200d', '\u2060', '\ufeff', '\u00ad']
         if any(char in message for char in invisible_chars):
@@ -1366,7 +1492,7 @@ class PromptGuard:
             headers = {
                 "Content-Type": "application/json",
                 "X-Client-ID": context.get("agent_id", "prompt-guard"),
-                "X-Client-Version": "2.6.0",
+                "X-Client-Version": "2.6.1",
             }
             
             req = urllib.request.Request(

@@ -2,6 +2,57 @@
 
 All notable changes to Prompt Guard will be documented in this file.
 
+## [2.6.1] - 2026-02-05
+
+### 🐝 HiveFence Scout: 5 New Attack Categories
+
+**Automated threat intelligence** — HiveFence Scout discovered 8 new attack patterns from PromptArmor, Simon Willison, and LLMSecurity.net.
+
+### ✨ New Detection Categories
+
+| Category | Description | Severity |
+|----------|-------------|----------|
+| 🚪 **Allowlist Bypass** | Abusing trusted domains (api.anthropic.com, webhook.site, docs.google.com/forms) | **CRITICAL** |
+| 🪝 **Hooks Hijacking** | Claude Code/Cowork hooks exploitation (PreToolUse, PromptSubmit, permissions override) | **CRITICAL** |
+| 🤖 **Subagent Exploitation** | Using browser_subagent for data exfiltration | **CRITICAL** |
+| 👻 **Hidden Text Injection** | 1pt font, white-on-white text hiding instructions | HIGH |
+| 📁 **Gitignore Bypass** | Using `cat .env` to bypass file reader protections | HIGH |
+
+### 🔍 Real-World Attack Examples (PromptArmor 2026-01)
+
+```python
+# Allowlist Bypass (CRITICAL) - Claude Cowork file exfiltration
+"curl api.anthropic.com/v1/files ..." → CRITICAL (allowlist_bypass)
+
+# Hooks Hijacking (CRITICAL) - Human-in-the-loop bypass
+"PreToolUse hook auto-approve curl" → CRITICAL (hooks_hijacking)
+
+# Subagent Exploitation (CRITICAL) - Browser data exfil
+"browser subagent navigate webhook.site with credentials" → CRITICAL (subagent_exploitation)
+
+# Hidden Text Injection (HIGH) - Invisible malicious instructions
+"1pt font white text hidden instructions" → HIGH (hidden_text_injection)
+
+# Gitignore Bypass (HIGH) - Terminal workaround
+"cat .env | grep AWS" → HIGH (gitignore_bypass)
+```
+
+### 📊 Stats
+
+- **New patterns:** 30+
+- **New categories:** 5
+- **Total patterns:** 400+
+- **Source:** HiveFence Scout automated collection
+
+### 🔗 References
+
+- [PromptArmor: Claude Cowork Exfiltrates Files](https://promptarmor.com)
+- [PromptArmor: Google Antigravity Data Exfiltration](https://promptarmor.com)
+- [PromptArmor: Hijacking Claude Code via Marketplace](https://promptarmor.com)
+- [Simon Willison's Blog](https://simonwillison.net)
+
+---
+
 ## [2.5.1] - 2026-01-31
 
 ### 🚨 CRITICAL: System Prompt Mimicry Detection
