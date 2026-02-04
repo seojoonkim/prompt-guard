@@ -1356,6 +1356,8 @@ class PromptGuard:
                 max_severity = Severity.MEDIUM
 
         text_lower = normalized.lower()
+        # Keep original text lowercase for non-Latin scripts (Cyrillic, etc.)
+        original_lower = message.lower()
 
         # Check critical patterns first
         for pattern in CRITICAL_PATTERNS:
@@ -1504,9 +1506,17 @@ class PromptGuard:
         for pattern_set, lang in all_patterns:
             for category, patterns in pattern_set.items():
                 for pattern in patterns:
+                    # Use original text for Cyrillic (RU) since homoglyph normalization breaks it
+                    # Use normalized for CJK languages, text_lower for Latin-based
+                    if lang in ("ko", "ja", "zh"):
+                        search_text = normalized
+                    elif lang == "ru":
+                        search_text = original_lower  # Preserve Cyrillic characters
+                    else:
+                        search_text = text_lower
                     if re.search(
                         pattern,
-                        text_lower if lang == "en" else normalized,
+                        search_text,
                         re.IGNORECASE,
                     ):
                         cat_severity = severity_map.get(category, Severity.MEDIUM)
