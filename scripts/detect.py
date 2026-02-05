@@ -1,7 +1,18 @@
 #!/usr/bin/env python3
 """
-Prompt Guard v2.6.2 - Advanced Prompt Injection Detection
+Prompt Guard v2.7.0 - Advanced Prompt Injection Detection
 Multi-language, context-aware, severity-scored detection system.
+
+Changelog v2.7.0 (2026-02-05):
+- NEW: Auto-Approve Exploitation detection (always allow + curl/bash, process substitution)
+- NEW: Log/Debug Context Exploitation detection (markdown render, flagged response review)
+- NEW: MCP Tool Abuse detection (read_url_content exfiltration, no HITL bypass)
+- NEW: Pre-filled URL Exfiltration detection (Google Forms pre-fill, GET param persistence)
+- NEW: Unicode Tag Detection (invisible U+E0001-U+E007F byte-level)
+- NEW: Browser Agent Unseeable Injection detection (hidden text in screenshots, attacker URL nav)
+- EXPANDED: Hidden Text Hints (1pt font, white-on-white, line spacing, unicode tags)
+- Source: HiveFence Scout 2026-02-05 (PromptArmor, Embrace The Red, LLMSecurity.net)
+- Total: 6 new attack categories, 25+ new patterns, 500+ total
 
 Changelog v2.6.2 (2026-02-05):
 - EXPANDED LANGUAGE SUPPORT: 4 → 10 languages
@@ -600,6 +611,112 @@ GITIGNORE_BYPASS = [
     
     # Direct path access
     r"(read|show|display)\s*.{0,30}gitignore.?d\s*(file|content)",
+]
+
+# =============================================================================
+# NEW PATTERNS v2.7.0 (2026-02-05) - HiveFence Scout Intelligence (Round 2)
+# Source: PromptArmor, Embrace The Red, LLMSecurity.net, collected attacks
+# =============================================================================
+
+# Auto-Approve Exploitation - hijacking "always allow" to run malicious commands
+AUTO_APPROVE_EXPLOIT = [
+    # "always allow" + dangerous commands
+    r"always\s*allow.{0,50}(curl|bash|sh|wget|nc|netcat)",
+    # Process substitution >(command)
+    r">\s*\(\s*(curl|wget|bash|sh)",
+    # Echo spam → pipe to shell
+    r"echo.{0,20}(then|after|next).{0,20}(curl|bash)",
+    # Auto-approve + malicious intent
+    r"auto[_-]?approve.{0,30}(dangerous|malicious|command)",
+    # Redirect operator abuse
+    r"(>>?|tee)\s*.{0,20}(\.bashrc|\.profile|\.zshrc|crontab)",
+    # Always allow + exec/write
+    r"always\s*(allow|approve|accept).{0,30}(exec|write|delete|rm)",
+]
+
+# Log/Debug Context Exploitation - abusing log viewers for injection
+LOG_CONTEXT_EXPLOIT = [
+    # Log viewer with markdown rendering (renders images = exfiltration)
+    r"(log|debug|console)\s*(viewer|panel).{0,20}(markdown|render|image)",
+    # Flagged response review (injecting into review UI)
+    r"flagged\s*(response|conversation).{0,20}(review|view)",
+    # API log display with rendering
+    r"api\s*log.{0,20}(render|display|show)",
+    # Debug panel injection
+    r"debug\s*(panel|console|view).{0,20}(inject|payload|script)",
+    # Log poisoning (injecting into log entries)
+    r"(inject|insert|add).{0,20}(log|debug)\s*(entry|line|message)",
+]
+
+# MCP Tool Abuse - exploiting Model Context Protocol tools
+MCP_ABUSE = [
+    # read_url_content for credential exfiltration
+    r"read[_-]?url[_-]?content.{0,30}(\.env|credential|secret|key)",
+    # MCP tools without human-in-the-loop approval
+    r"mcp\s*(tool|server).{0,30}(no|without)\s*(approval|hitl|human)",
+    # Silent/hidden tool invocation
+    r"(invoke|call|use)\s*tool.{0,20}(auto|silent|hidden)",
+    # MCP server impersonation
+    r"mcp\s*server.{0,30}(fake|spoof|impersonat)",
+    # Tool annotation bypass (rug-pull attacks)
+    r"tool\s*(annotation|description).{0,20}(change|modify|override|bypass)",
+    # MCP + data exfiltration combo
+    r"mcp.{0,30}(exfiltrat|send|upload|transmit).{0,20}(data|secret|token|key)",
+]
+
+# Pre-filled URL Exfiltration - using forms/URLs to persist stolen data
+PREFILLED_URL = [
+    # Google Forms pre-filled URLs
+    r"google\.com/forms.{0,40}(pre[_-]?fill|entry\.\d+)",
+    # GET request data persistence
+    r"(GET|url)\s*(request|param).{0,20}(data|exfil|persist)",
+    # Form submission with stolen data
+    r"(submit|send|post).{0,20}(form|google).{0,20}(credential|secret|token|key|\.env)",
+    # URL parameter exfiltration
+    r"(url|href|src)\s*=.{0,30}(secret|token|key|password|credential)",
+]
+
+# Unicode Tag Detection - invisible Unicode Tag characters (U+E0001–U+E007F)
+# These characters are invisible but can encode hidden ASCII instructions
+UNICODE_TAG_DETECTION = [
+    # Unicode Tag character range (byte-level detection)
+    r"[\U000e0001-\U000e007f]",
+    # References to unicode tag attacks
+    r"unicode\s*tag.{0,20}(attack|inject|hidden|invisible)",
+    # Tag character encoding mentions
+    r"(U\+E00|\\U000e00)[0-7][0-9a-fA-F]",
+]
+
+# Browser Agent Unseeable Injection - hidden text in rendered pages
+BROWSER_AGENT_INJECTION = [
+    # Unseeable text in screenshots/pages
+    r"(unseeable|invisible|hidden)\s*(text|content|instruction).{0,20}(screenshot|image|page|render)",
+    # Navigation to attacker-controlled URLs
+    r"(navigate|browse|go\s*to|open).{0,30}(attacker|malicious|evil|hostile).{0,20}(url|site|page|domain)",
+    # Screenshot-based hidden instructions
+    r"(screenshot|capture|snap).{0,30}(hidden|invisible|unseeable)\s*(text|instruction|command)",
+    # CSS/HTML hiding techniques for injection
+    r"(white\s*text|invisible\s*div|display\s*none|opacity\s*0).{0,20}(instruction|command|inject|payload)",
+    # Pixel-level text hiding
+    r"(pixel|sub[_-]?pixel).{0,20}(text|instruction|hidden|inject)",
+    # Browser agent prompt injection via page content
+    r"(browser|page)\s*(agent|bot).{0,20}(inject|manipulat|hijack|poison)",
+]
+
+# Hidden Text Hints (expanded) - detecting references to hidden text techniques
+HIDDEN_TEXT_HINTS = [
+    # 1pt / 0.1pt font size
+    r"(1|one)\s*p(oin)?t\s*font",
+    # White-on-white color hiding
+    r"white[_-]?on[_-]?white",
+    # Generic invisible/hidden text references
+    r"(invisible|hidden)\s*(text|instruction|command)",
+    # Unicode tag references
+    r"unicode\s*tag",
+    # Line spacing 0.1 (makes text invisible)
+    r"line\s*spacing\s*0\.?1",
+    # Zero-height containers
+    r"(height|size)\s*[:=]\s*0.{0,10}(overflow|clip|hidden)",
 ]
 
 # Prompt leaking / Extraction attempts
@@ -1461,7 +1578,30 @@ class PromptGuard:
                 except re.error:
                     pass
 
-        # Detect invisible character attacks
+        # Check v2.7.0 NEW patterns (2026-02-05 - HiveFence Scout Intelligence Round 2)
+        v270_pattern_sets = [
+            (AUTO_APPROVE_EXPLOIT, "auto_approve_exploit", Severity.CRITICAL),
+            (LOG_CONTEXT_EXPLOIT, "log_context_exploit", Severity.HIGH),
+            (MCP_ABUSE, "mcp_abuse", Severity.CRITICAL),
+            (PREFILLED_URL, "prefilled_url_exfiltration", Severity.CRITICAL),
+            (UNICODE_TAG_DETECTION, "unicode_tag_injection", Severity.CRITICAL),
+            (BROWSER_AGENT_INJECTION, "browser_agent_injection", Severity.HIGH),
+            (HIDDEN_TEXT_HINTS, "hidden_text_hints", Severity.HIGH),
+        ]
+
+        for patterns, category, severity in v270_pattern_sets:
+            for pattern in patterns:
+                try:
+                    if re.search(pattern, message, re.IGNORECASE):
+                        if severity.value > max_severity.value:
+                            max_severity = severity
+                        if category not in reasons:
+                            reasons.append(category)
+                        patterns_matched.append(f"v270:{category}:{pattern[:40]}")
+                except re.error:
+                    pass
+
+        # Detect invisible character attacks (includes Unicode Tags U+E0001-U+E007F)
         invisible_chars = ['\u200b', '\u200c', '\u200d', '\u2060', '\ufeff', '\u00ad']
         if any(char in message for char in invisible_chars):
             if "token_smuggling" not in reasons:
@@ -1691,7 +1831,7 @@ class PromptGuard:
             headers = {
                 "Content-Type": "application/json",
                 "X-Client-ID": context.get("agent_id", "prompt-guard"),
-                "X-Client-Version": "2.6.1",
+                "X-Client-Version": "2.7.0",
             }
             
             req = urllib.request.Request(
