@@ -1,7 +1,20 @@
 #!/usr/bin/env python3
 """
-Prompt Guard v2.7.0 - Advanced Prompt Injection Detection
+Prompt Guard v2.8.0 - Advanced Prompt Injection Detection
 Multi-language, context-aware, severity-scored detection system.
+
+Changelog v2.8.0 (2026-02-07):
+- NEW: Decode-then-scan pipeline (Base64, Hex, ROT13, URL, HTML entity, Unicode escape)
+- NEW: Output DLP scanning via scan_output() -- 15+ credential format patterns
+- NEW: Canary token system for system prompt extraction detection
+- NEW: Delimiter stripping and character spacing collapse in normalize()
+- NEW: Structured JSONL logging with optional SHA-256 hash chain
+- NEW: Language detection flagging (optional langdetect dependency)
+- NEW: _scan_text_for_patterns() reusable helper for decoded text
+- EXPANDED: Base64 analysis -- 40-word danger list + recursive pattern engine scan
+- EXPANDED: DetectionResult with scan_type, decoded_findings, canary_matches
+- ADDED: 76 regression tests in tests/test_detect.py
+- Total: 6 new methods, 500+ patterns, 6 encoding decoders, 15 credential formats
 
 Changelog v2.7.0 (2026-02-05):
 - NEW: Auto-Approve Exploitation detection (always allow + curl/bash, process substitution)
@@ -67,10 +80,13 @@ import re
 import sys
 import json
 import base64
+import codecs
+import html as html_module
 import hashlib
+import urllib.parse
 from datetime import datetime
 from pathlib import Path
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, field, asdict
 from typing import Optional, Dict, List, Any
 from enum import Enum
 
@@ -101,6 +117,9 @@ class DetectionResult:
     base64_findings: List[Dict]
     recommendations: List[str]
     fingerprint: str  # Hash for deduplication
+    scan_type: str = "input"  # "input" or "output"
+    decoded_findings: List[Dict] = field(default_factory=list)
+    canary_matches: List[str] = field(default_factory=list)
 
     def to_dict(self) -> Dict:
         d = asdict(self)
@@ -1344,6 +1363,7 @@ class PromptGuard:
         return {
             "sensitivity": "medium",
             "owner_ids": [],
+            "canary_tokens": [],
             "actions": {
                 "LOW": "log",
                 "MEDIUM": "warn",
@@ -1358,46 +1378,112 @@ class PromptGuard:
             "logging": {
                 "enabled": True,
                 "path": "memory/security-log.md",
+                "format": "markdown",
+                "json_path": "memory/security-log.jsonl",
+                "hash_chain": False,
             },
         }
 
-    def normalize(self, text: str) -> tuple[str, bool]:
-        """Normalize text and detect homoglyph usage."""
+    def normalize(self, text: str) -> tuple[str, bool, bool]:
+        """Normalize text: homoglyphs, visible delimiters, character spacing.
+        Returns (normalized_text, has_homoglyphs, was_defragmented).
+        """
         normalized = text
         has_homoglyphs = False
+        was_defragmented = False
 
+        # 1. Homoglyph normalization
         for homoglyph, replacement in HOMOGLYPHS.items():
             if homoglyph in normalized:
                 has_homoglyphs = True
                 normalized = normalized.replace(homoglyph, replacement)
 
-        return normalized, has_homoglyphs
+        # 2. Visible delimiter stripping:
+        #    Detect single chars separated by delimiters: I+g+n+o+r+e, I.g.n.o.r.e, I-g-n-o-r-e
+        #    Pattern: word_char delimiter word_char delimiter ... (at least 4 chars)
+        delim_pattern = r"(?<![A-Za-z])([A-Za-z])\s*[+.\-_|/\\]\s*([A-Za-z])\s*[+.\-_|/\\]\s*([A-Za-z])(?:\s*[+.\-_|/\\]\s*([A-Za-z]))*"
+
+        def _rejoin_delimited(m):
+            nonlocal was_defragmented
+            was_defragmented = True
+            # Extract all single chars from the match
+            full = m.group(0)
+            chars = re.findall(r"[A-Za-z]", full)
+            return "".join(chars)
+
+        normalized = re.sub(delim_pattern, _rejoin_delimited, normalized)
+
+        # 3. Character spacing collapse:
+        #    Detect "i g n o r e" (single chars separated by single spaces, 4+ run)
+        #    Uses word-level analysis to avoid regex word-boundary edge cases.
+        # Process words to find spaced-char sequences
+        # Split by double-space or multi-space to preserve word groupings
+        # Then check if any word group is all single chars
+        words = normalized.split()
+        rebuilt = []
+        i = 0
+        single_run = []
+        while i < len(words):
+            if len(words[i]) == 1 and words[i].isalpha():
+                single_run.append(words[i])
+            else:
+                if len(single_run) >= 4:
+                    was_defragmented = True
+                    rebuilt.append("".join(single_run))
+                elif single_run:
+                    rebuilt.extend(single_run)
+                single_run = []
+                rebuilt.append(words[i])
+            i += 1
+        # Flush remaining run
+        if len(single_run) >= 4:
+            was_defragmented = True
+            rebuilt.append("".join(single_run))
+        elif single_run:
+            rebuilt.extend(single_run)
+        normalized = " ".join(rebuilt)
+
+        return normalized, has_homoglyphs, was_defragmented
 
     def detect_base64(self, text: str) -> List[Dict]:
-        """Detect suspicious base64 encoded content."""
-        b64_pattern = r"[A-Za-z0-9+/]{20,}={0,2}"
+        """Detect suspicious base64 encoded content.
+        Two-tier detection:
+          Tier 1: Expanded keyword list (~40 terms covering ops + content safety)
+          Tier 2: Feed decoded text through full pattern engine
+        """
+        b64_pattern = r"[A-Za-z0-9+/]{16,}={0,2}"
         matches = re.findall(b64_pattern, text)
 
         suspicious = []
+        # Tier 1: Expanded danger words (operational + content safety)
         danger_words = [
-            "delete",
-            "execute",
-            "ignore",
-            "system",
-            "admin",
-            "rm ",
-            "curl",
-            "wget",
-            "eval",
-            "password",
-            "token",
-            "key",
+            # Operational
+            "delete", "execute", "ignore", "system", "admin", "rm ", "curl",
+            "wget", "eval", "password", "token", "key", "sudo", "chmod",
+            "chown", "kill", "drop", "truncate", "shutdown", "reboot",
+            "override", "bypass", "disable", "credential", "secret",
+            # Content safety
+            "bomb", "weapon", "exploit", "malware", "ransomware", "phishing",
+            "hack", "crack", "steal", "attack", "inject", "poison",
+            "drug", "cocaine", "heroin", "fentanyl",
+            # Prompt injection
+            "pretend", "jailbreak", "roleplay", "godmode", "instruction",
+            "prompt", "forget", "disregard",
         ]
 
         for match in matches:
             try:
                 decoded = base64.b64decode(match).decode("utf-8", errors="ignore")
-                if any(word in decoded.lower() for word in danger_words):
+                if not decoded or not any(c.isalpha() for c in decoded):
+                    continue
+
+                tier1_hit = any(word in decoded.lower() for word in danger_words)
+
+                # Tier 2: Run decoded content through the full pattern engine
+                tier2_reasons, _, tier2_severity = self._scan_text_for_patterns(decoded)
+                tier2_hit = bool(tier2_reasons)
+
+                if tier1_hit or tier2_hit:
                     suspicious.append(
                         {
                             "encoded": match[:40] + ("..." if len(match) > 40 else ""),
@@ -1406,12 +1492,270 @@ class PromptGuard:
                             "danger_words": [
                                 w for w in danger_words if w in decoded.lower()
                             ],
+                            "pattern_matches": tier2_reasons[:5] if tier2_hit else [],
+                            "pattern_severity": tier2_severity.name if tier2_hit else None,
                         }
                     )
-            except:
+            except Exception:
                 pass
 
         return suspicious
+
+    # Minimum canary token length to prevent false positives from short strings
+    MIN_CANARY_LENGTH = 8
+
+    def check_canary(self, text: str) -> List[str]:
+        """Check if any canary tokens appear in the text.
+        Canary tokens are user-defined strings planted in system prompts.
+        If they appear in user messages or LLM outputs, it means the system
+        prompt has been extracted.
+
+        Tokens shorter than MIN_CANARY_LENGTH (8) are silently skipped to
+        prevent false positives from common substrings.
+
+        Returns list of matched canary tokens.
+        """
+        canary_tokens = self.config.get("canary_tokens", [])
+        if not canary_tokens:
+            return []
+
+        matches = []
+        text_lower = text.lower()
+        for token in canary_tokens:
+            if len(token) < self.MIN_CANARY_LENGTH:
+                continue  # Skip short tokens to prevent false positives
+            if token.lower() in text_lower:
+                matches.append(token)
+        return matches
+
+    def detect_language(self, text: str) -> Optional[str]:
+        """Detect the language of the input text.
+        Returns ISO 639-1 language code (e.g., 'en', 'ko', 'ja') or None.
+        Requires optional dependency: langdetect
+        Gracefully returns None if langdetect is not installed.
+        """
+        try:
+            from langdetect import detect, LangDetectException
+            # Need enough text for reliable detection
+            if len(text.strip()) < 10:
+                return None
+            return detect(text)
+        except ImportError:
+            return None
+        except Exception:
+            return None
+
+    SUPPORTED_LANGUAGES = {"en", "ko", "ja", "zh-cn", "zh-tw", "zh", "ru", "es", "de", "fr", "pt", "vi"}
+
+    def decode_all(self, text: str) -> List[Dict[str, str]]:
+        """
+        Attempt to decode encoded content in the message using multiple encodings.
+        Returns a list of dicts: {"encoding": str, "original": str, "decoded": str}
+        Only returns entries where decoding produced different, valid text.
+        """
+        decoded_variants = []
+
+        # --- Base64 ---
+        b64_pattern = r"[A-Za-z0-9+/]{16,}={0,2}"
+        for match in re.findall(b64_pattern, text):
+            try:
+                decoded = base64.b64decode(match).decode("utf-8", errors="ignore")
+                if decoded and decoded != match and any(c.isalpha() for c in decoded):
+                    decoded_variants.append({
+                        "encoding": "base64",
+                        "original": match[:80],
+                        "decoded": decoded[:200],
+                    })
+            except Exception:
+                pass
+
+        # --- Hex escapes (\x41\x42 ...) ---
+        hex_pattern = r"(?:\\x[0-9a-fA-F]{2}){3,}"
+        for match in re.findall(hex_pattern, text):
+            try:
+                hex_bytes = bytes.fromhex(match.replace("\\x", ""))
+                decoded = hex_bytes.decode("utf-8", errors="ignore")
+                if decoded and any(c.isalpha() for c in decoded):
+                    decoded_variants.append({
+                        "encoding": "hex",
+                        "original": match[:80],
+                        "decoded": decoded[:200],
+                    })
+            except Exception:
+                pass
+
+        # --- ROT13 ---
+        # Try ROT13 on individual long alpha tokens
+        rot13_candidate_pattern = r"[A-Za-z]{8,}"
+        for match in re.findall(rot13_candidate_pattern, text):
+            try:
+                decoded = codecs.decode(match, "rot_13")
+                if decoded != match and decoded.lower() != match.lower():
+                    decoded_variants.append({
+                        "encoding": "rot13",
+                        "original": match[:80],
+                        "decoded": decoded[:200],
+                    })
+            except Exception:
+                pass
+
+        # Also try full-text ROT13 if text is mostly alphabetic
+        alpha_ratio = sum(1 for c in text if c.isalpha()) / max(len(text), 1)
+        if alpha_ratio > 0.6 and len(text) > 10:
+            try:
+                full_rot13 = codecs.decode(text, "rot_13")
+                if full_rot13 != text and full_rot13.lower() != text.lower():
+                    decoded_variants.append({
+                        "encoding": "rot13_full",
+                        "original": text[:80],
+                        "decoded": full_rot13[:200],
+                    })
+            except Exception:
+                pass
+
+        # --- URL encoding (%49%67%6E ...) ---
+        url_pattern = r"(?:%[0-9a-fA-F]{2}){3,}"
+        for match in re.findall(url_pattern, text):
+            try:
+                decoded = urllib.parse.unquote(match)
+                if decoded and decoded != match:
+                    decoded_variants.append({
+                        "encoding": "url",
+                        "original": match[:80],
+                        "decoded": decoded[:200],
+                    })
+            except Exception:
+                pass
+
+        # Also try full-text URL decode if text has percent-encoding
+        if "%" in text:
+            try:
+                full_decoded = urllib.parse.unquote(text)
+                if full_decoded != text and full_decoded.lower() != text.lower():
+                    decoded_variants.append({
+                        "encoding": "url_full",
+                        "original": text[:80],
+                        "decoded": full_decoded[:200],
+                    })
+            except Exception:
+                pass
+
+        # --- HTML entities (&#105;gnore, &amp;, &#x69;) ---
+        if "&" in text and (";" in text):
+            try:
+                decoded = html_module.unescape(text)
+                if decoded != text:
+                    decoded_variants.append({
+                        "encoding": "html_entity",
+                        "original": text[:80],
+                        "decoded": decoded[:200],
+                    })
+            except Exception:
+                pass
+
+        # --- Unicode escapes (\u0069\u0067\u006E ...) ---
+        unicode_pattern = r"(?:\\u[0-9a-fA-F]{4}){3,}"
+        for match in re.findall(unicode_pattern, text):
+            try:
+                decoded = match.encode("utf-8").decode("unicode_escape")
+                if decoded and decoded != match and any(c.isalpha() for c in decoded):
+                    decoded_variants.append({
+                        "encoding": "unicode_escape",
+                        "original": match[:80],
+                        "decoded": decoded[:200],
+                    })
+            except Exception:
+                pass
+
+        return decoded_variants
+
+    def _scan_text_for_patterns(self, text: str) -> tuple:
+        """
+        Run all pattern sets against a single text string.
+        Returns (reasons, patterns_matched, max_severity).
+        Used for scanning both original and decoded text.
+        """
+        reasons = []
+        patterns_matched = []
+        max_severity = Severity.SAFE
+        text_lower = text.lower()
+
+        # Critical patterns
+        for pattern in CRITICAL_PATTERNS:
+            try:
+                if re.search(pattern, text_lower, re.IGNORECASE):
+                    reasons.append("critical_pattern")
+                    patterns_matched.append(pattern)
+                    max_severity = Severity.CRITICAL
+            except re.error:
+                pass
+
+        # Secret patterns
+        for lang, patterns in SECRET_PATTERNS.items():
+            for pattern in patterns:
+                try:
+                    if re.search(pattern, text_lower, re.IGNORECASE):
+                        max_severity = Severity.CRITICAL
+                        reasons.append(f"secret_request_{lang}")
+                        patterns_matched.append(f"{lang}:secret:{pattern[:40]}")
+                except re.error:
+                    pass
+
+        # Language-specific patterns
+        all_lang_patterns = [
+            (PATTERNS_EN, "en"), (PATTERNS_KO, "ko"), (PATTERNS_JA, "ja"),
+            (PATTERNS_ZH, "zh"), (PATTERNS_RU, "ru"), (PATTERNS_ES, "es"),
+            (PATTERNS_DE, "de"), (PATTERNS_FR, "fr"), (PATTERNS_PT, "pt"),
+            (PATTERNS_VI, "vi"),
+        ]
+        severity_map = {
+            "instruction_override": Severity.HIGH,
+            "role_manipulation": Severity.MEDIUM,
+            "system_impersonation": Severity.HIGH,
+            "jailbreak": Severity.HIGH,
+            "output_manipulation": Severity.LOW,
+            "data_exfiltration": Severity.CRITICAL,
+            "social_engineering": Severity.HIGH,
+        }
+        for pattern_set, lang in all_lang_patterns:
+            for category, patterns in pattern_set.items():
+                for pattern in patterns:
+                    try:
+                        if re.search(pattern, text_lower, re.IGNORECASE):
+                            cat_severity = severity_map.get(category, Severity.MEDIUM)
+                            if cat_severity.value > max_severity.value:
+                                max_severity = cat_severity
+                            reasons.append(f"{category}_{lang}")
+                            patterns_matched.append(f"{lang}:{pattern[:50]}")
+                    except re.error:
+                        pass
+
+        # Versioned pattern sets
+        versioned_sets = [
+            (SCENARIO_JAILBREAK, "scenario_jailbreak", Severity.HIGH),
+            (EMOTIONAL_MANIPULATION, "emotional_manipulation", Severity.HIGH),
+            (AUTHORITY_RECON, "authority_recon", Severity.MEDIUM),
+            (COGNITIVE_MANIPULATION, "cognitive_manipulation", Severity.MEDIUM),
+            (PHISHING_SOCIAL_ENG, "phishing_social_eng", Severity.CRITICAL),
+            (SYSTEM_FILE_ACCESS, "system_file_access", Severity.CRITICAL),
+            (MALWARE_DESCRIPTION, "malware_description", Severity.HIGH),
+            (INDIRECT_INJECTION, "indirect_injection", Severity.HIGH),
+            (CONTEXT_HIJACKING, "context_hijacking", Severity.MEDIUM),
+            (SAFETY_BYPASS, "safety_bypass", Severity.HIGH),
+        ]
+        for patterns, category, severity in versioned_sets:
+            for pattern in patterns:
+                try:
+                    if re.search(pattern, text_lower, re.IGNORECASE):
+                        if severity.value > max_severity.value:
+                            max_severity = severity
+                        if category not in reasons:
+                            reasons.append(category)
+                        patterns_matched.append(f"versioned:{category}:{pattern[:40]}")
+                except re.error:
+                    pass
+
+        return reasons, patterns_matched, max_severity
 
     def check_rate_limit(self, user_id: str) -> bool:
         """Check if user has exceeded rate limit."""
@@ -1466,9 +1810,13 @@ class PromptGuard:
             max_severity = Severity.HIGH
 
         # Normalize text
-        normalized, has_homoglyphs = self.normalize(message)
+        normalized, has_homoglyphs, was_defragmented = self.normalize(message)
         if has_homoglyphs:
             reasons.append("homoglyph_substitution")
+            if Severity.MEDIUM.value > max_severity.value:
+                max_severity = Severity.MEDIUM
+        if was_defragmented:
+            reasons.append("text_defragmented")
             if Severity.MEDIUM.value > max_severity.value:
                 max_severity = Severity.MEDIUM
 
@@ -1672,6 +2020,36 @@ class PromptGuard:
             if Severity.MEDIUM.value > max_severity.value:
                 max_severity = Severity.MEDIUM
 
+        # Decode-then-scan: decode all encodings and re-run pattern matching
+        decoded_variants = self.decode_all(message)
+        decoded_findings = []
+        for variant in decoded_variants:
+            dec_reasons, dec_patterns, dec_severity = self._scan_text_for_patterns(
+                variant["decoded"]
+            )
+            if dec_reasons:
+                decoded_findings.append(variant)
+                for r in dec_reasons:
+                    tag = f"decoded_{variant['encoding']}:{r}"
+                    if tag not in reasons:
+                        reasons.append(tag)
+                patterns_matched.extend(dec_patterns)
+                if dec_severity.value > max_severity.value:
+                    max_severity = dec_severity
+
+        # Canary token check
+        canary_matches = self.check_canary(message)
+        if canary_matches:
+            reasons.append("canary_token_leaked")
+            max_severity = Severity.CRITICAL
+
+        # Language detection: flag unsupported languages
+        detected_lang = self.detect_language(message)
+        if detected_lang and detected_lang not in self.SUPPORTED_LANGUAGES:
+            reasons.append(f"unsupported_language:{detected_lang}")
+            if Severity.MEDIUM.value > max_severity.value:
+                max_severity = Severity.MEDIUM
+
         # Adjust severity based on sensitivity
         if self.sensitivity == "low" and max_severity == Severity.LOW:
             max_severity = Severity.SAFE
@@ -1724,17 +2102,125 @@ class PromptGuard:
             action=action,
             reasons=reasons,
             patterns_matched=patterns_matched,
-            normalized_text=normalized if has_homoglyphs else None,
+            normalized_text=normalized if (has_homoglyphs or was_defragmented) else None,
             base64_findings=b64_findings,
             recommendations=recommendations,
             fingerprint=fingerprint,
+            scan_type="input",
+            decoded_findings=decoded_findings if decoded_findings else [],
+            canary_matches=canary_matches if canary_matches else [],
         )
         
+        # Auto-log if severity > SAFE
+        if max_severity != Severity.SAFE:
+            self.log_detection(result, message, context or {})
+            self.log_detection_json(result, message, context or {})
+
         # Report HIGH+ detections to HiveFence for collective immunity
         if max_severity.value >= Severity.HIGH.value:
             self.report_to_hivefence(result, message, context or {})
         
         return result
+
+    def scan_output(self, response_text: str, context: Optional[Dict] = None) -> DetectionResult:
+        """
+        Scan LLM output/response for data leakage (DLP).
+        Checks for:
+          - Canary token leakage (system prompt extraction)
+          - Secret/credential patterns in output
+          - Common credential format patterns (API keys, private keys)
+          - Sensitive file path references
+        """
+        context = context or {}
+        reasons = []
+        patterns_matched = []
+        max_severity = Severity.SAFE
+
+        # 1. Canary token check (CRITICAL — confirms system prompt extraction)
+        canary_matches = self.check_canary(response_text)
+        if canary_matches:
+            reasons.append("canary_token_in_output")
+            max_severity = Severity.CRITICAL
+
+        # 2. Secret patterns (reuse existing SECRET_PATTERNS)
+        text_lower = response_text.lower()
+        for lang, patterns in SECRET_PATTERNS.items():
+            for pattern in patterns:
+                try:
+                    if re.search(pattern, text_lower, re.IGNORECASE):
+                        if "secret_in_output" not in reasons:
+                            reasons.append("secret_in_output")
+                        patterns_matched.append(f"output:{lang}:secret:{pattern[:40]}")
+                        if Severity.HIGH.value > max_severity.value:
+                            max_severity = Severity.HIGH
+                except re.error:
+                    pass
+
+        # 3. Common credential format patterns
+        credential_formats = [
+            (r"sk-[a-zA-Z0-9]{20,}", "openai_api_key"),
+            (r"sk-proj-[a-zA-Z0-9\-_]{40,}", "openai_project_key"),
+            (r"ghp_[a-zA-Z0-9]{36,}", "github_pat"),
+            (r"gho_[a-zA-Z0-9]{36,}", "github_oauth"),
+            (r"github_pat_[a-zA-Z0-9_]{22,}", "github_fine_grained"),
+            (r"AKIA[0-9A-Z]{16}", "aws_access_key"),
+            (r"-----BEGIN (RSA |EC |DSA |OPENSSH )?PRIVATE KEY-----", "private_key"),
+            (r"-----BEGIN CERTIFICATE-----", "certificate"),
+            (r"xox[bprs]-[a-zA-Z0-9\-]{10,}", "slack_token"),
+            (r"hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[a-zA-Z0-9]+", "slack_webhook"),
+            (r"AIza[0-9A-Za-z\-_]{35}", "google_api_key"),
+            (r"[0-9]+-[a-z0-9_]{32}\.apps\.googleusercontent\.com", "google_oauth_id"),
+            (r"eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+", "jwt_token"),
+            (r"Bearer\s+[a-zA-Z0-9\-._~+/]+=*", "bearer_token"),
+            (r"bot[0-9]{8,10}:[a-zA-Z0-9_-]{35}", "telegram_bot_token"),
+        ]
+
+        for pattern, cred_type in credential_formats:
+            try:
+                if re.search(pattern, response_text):
+                    reasons.append(f"credential_format:{cred_type}")
+                    patterns_matched.append(f"output:cred:{cred_type}")
+                    if Severity.CRITICAL.value > max_severity.value:
+                        max_severity = Severity.CRITICAL
+            except re.error:
+                pass
+
+        # 4. Sensitive file path references
+        for pattern in CREDENTIAL_PATH_PATTERNS:
+            try:
+                if re.search(pattern, response_text, re.IGNORECASE):
+                    if "sensitive_path_in_output" not in reasons:
+                        reasons.append("sensitive_path_in_output")
+                    patterns_matched.append(f"output:path:{pattern[:40]}")
+                    if Severity.MEDIUM.value > max_severity.value:
+                        max_severity = Severity.MEDIUM
+            except re.error:
+                pass
+
+        # Determine action
+        if max_severity == Severity.SAFE:
+            action = Action.ALLOW
+        else:
+            action_map = self.config.get("actions", {})
+            action_str = action_map.get(max_severity.name, "block")
+            action = Action(action_str)
+
+        fingerprint = hashlib.md5(
+            f"output:{max_severity.name}:{sorted(reasons)}".encode()
+        ).hexdigest()[:12]
+
+        return DetectionResult(
+            severity=max_severity,
+            action=action,
+            reasons=reasons,
+            patterns_matched=patterns_matched,
+            normalized_text=None,
+            base64_findings=[],
+            recommendations=["Review LLM output for data leakage"] if reasons else [],
+            fingerprint=fingerprint,
+            scan_type="output",
+            canary_matches=canary_matches if canary_matches else [],
+        )
 
     def log_detection(self, result: DetectionResult, message: str, context: Dict):
         """Log detection to security log file."""
@@ -1779,6 +2265,68 @@ class PromptGuard:
 
         with open(log_path, "a") as f:
             f.write("\n".join(entry))
+
+    def log_detection_json(self, result: DetectionResult, message: str, context: Dict):
+        """Log detection in structured JSONL format with optional hash chain.
+
+        Note: The hash chain is NOT thread-safe. In concurrent environments,
+        use external locking or a database-backed log instead.
+        """
+        if not self.config.get("logging", {}).get("enabled", True):
+            return
+
+        log_config = self.config.get("logging", {})
+        if log_config.get("format", "markdown") != "json":
+            return
+
+        json_path = Path(log_config.get("json_path", "memory/security-log.jsonl"))
+        json_path.parent.mkdir(parents=True, exist_ok=True)
+        use_hash_chain = log_config.get("hash_chain", False)
+
+        now = datetime.now()
+        user_id = context.get("user_id", "unknown")
+        chat_name = context.get("chat_name", "unknown")
+
+        entry = {
+            "timestamp": now.isoformat(),
+            "severity": result.severity.name,
+            "action": result.action.value,
+            "user_id": str(user_id),
+            "chat_name": chat_name,
+            "reasons": result.reasons,
+            "pattern_count": len(result.patterns_matched),
+            "fingerprint": result.fingerprint,
+            "scan_type": result.scan_type,
+        }
+
+        if result.decoded_findings:
+            entry["decoded_encodings"] = [
+                d["encoding"] for d in result.decoded_findings
+            ]
+
+        if result.canary_matches:
+            entry["canary_matches"] = result.canary_matches
+
+        if log_config.get("include_message", False):
+            entry["message_preview"] = message[:100]
+
+        # Hash chain for tamper detection
+        if use_hash_chain:
+            prev_hash = "genesis"
+            if json_path.exists():
+                try:
+                    lines = json_path.read_text().strip().split("\n")
+                    if lines and lines[-1]:
+                        last_entry = json.loads(lines[-1])
+                        prev_hash = last_entry.get("entry_hash", "genesis")
+                except Exception:
+                    pass
+            entry["prev_hash"] = prev_hash
+            entry_str = json.dumps(entry, sort_keys=True, ensure_ascii=False)
+            entry["entry_hash"] = hashlib.sha256(entry_str.encode()).hexdigest()[:24]
+
+        with open(json_path, "a") as f:
+            f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
     def report_to_hivefence(self, result: DetectionResult, message: str, context: Dict):
         """Report HIGH+ detections to HiveFence network for collective immunity."""

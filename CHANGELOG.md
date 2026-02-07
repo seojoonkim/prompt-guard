@@ -2,6 +2,55 @@
 
 All notable changes to Prompt Guard will be documented in this file.
 
+## [2.8.0] - 2026-02-07
+
+### Phase 1 Hardening: Obfuscation Detection + Output DLP
+
+**Security audit response** -- closes all encoding, splitting, and egress gaps identified in the v2.7.0 gap analysis.
+
+### New Features
+
+| Feature | Description | Severity Impact |
+|---------|-------------|-----------------|
+| **Decode-Then-Scan Pipeline** | Decodes Base64, Hex, ROT13, URL encoding, HTML entities, and Unicode escapes, then re-runs the full pattern engine against decoded text | Catches encoded injection that previously bypassed all regex |
+| **Output Scanning (DLP)** | New `scan_output()` method scans LLM responses for credential leakage, canary tokens, and sensitive data | Closes the egress blind spot |
+| **Canary Token System** | User-defined tokens planted in system prompts; detected in both input and output | Definitive system prompt extraction detection |
+| **Delimiter Normalization** | Strips visible delimiters between single chars (I+g+n+o+r+e) and collapses character spacing (i g n o r e) | Catches token-splitting evasion |
+| **Structured JSON Logging** | JSONL format with ISO 8601 timestamps, optional SHA-256 hash chain for tamper detection | SIEM-compatible forensic logging |
+| **Language Detection** | Optional langdetect integration flags unsupported languages at MEDIUM severity | Visibility into multilingual evasion |
+| **Expanded Base64 Analysis** | 40-word danger list + recursive full-pattern-engine scan of decoded content | Catches harmful-content prompts, not just operational commands |
+| **Credential Format Detection** | 15+ regex patterns for API keys (OpenAI, AWS, GitHub, Slack, Google, Telegram, JWT, etc.) | Output DLP for specific credential formats |
+| **Regression Test Suite** | 76 unit tests covering all new and existing features | Zero-to-full test coverage |
+
+### New Methods on PromptGuard
+
+- `decode_all(text)` -- multi-encoding decoder returning decoded variants
+- `scan_output(response_text, context)` -- DLP scanner for LLM responses
+- `check_canary(text)` -- canary token detection
+- `detect_language(text)` -- optional language detection
+- `log_detection_json(result, message, context)` -- structured JSONL logging
+- `_scan_text_for_patterns(text)` -- reusable pattern scanning for decoded text
+
+### New Config Keys
+
+```yaml
+canary_tokens: []           # User-defined canary strings
+logging:
+  format: markdown          # "markdown" or "json"
+  json_path: memory/security-log.jsonl
+  hash_chain: false         # SHA-256 tamper detection
+```
+
+### Stats
+
+- **New methods:** 6
+- **New test cases:** 76
+- **Credential format patterns:** 15
+- **Supported encodings (decode):** 6 (Base64, Hex, ROT13, URL, HTML entity, Unicode escape)
+- **Dependencies:** pyyaml (required), langdetect (optional)
+
+---
+
 ## [2.7.0] - 2026-02-05
 
 ### 🚀 Major Release: 6 New Detection Categories from HiveFence Scout

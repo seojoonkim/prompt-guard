@@ -1,4 +1,4 @@
-# Prompt Guard Configuration
+# Prompt Guard v2.8.0 Configuration
 # Copy to config.yaml and customize for your deployment
 
 prompt_guard:
@@ -13,6 +13,13 @@ prompt_guard:
   # Add your Telegram/Discord/etc user IDs here
   owner_ids:
     - "46291309"  # Example: Telegram user ID
+  
+  # Canary tokens (NEW in v2.8.0)
+  # Plant these strings in your system prompt. If they appear in user
+  # messages or LLM outputs, it confirms system prompt extraction.
+  canary_tokens:
+    # - "CANARY:7f3a9b2e"
+    # - "SENTINEL:a4c8d1f0"
   
   # Actions to take at each severity level
   # Options: allow, log, warn, block, block_notify
@@ -31,8 +38,14 @@ prompt_guard:
   # Security event logging
   logging:
     enabled: true
-    path: memory/security-log.md  # Where to write logs
+    path: memory/security-log.md  # Markdown log path
     include_message: true  # Include message content (privacy consideration)
+    
+    # Structured JSON logging (NEW in v2.8.0)
+    # Set format to "json" for SIEM-compatible JSONL output
+    format: markdown       # "markdown" (default) or "json"
+    json_path: memory/security-log.jsonl
+    hash_chain: false      # Enable SHA-256 hash chain for tamper detection
   
   # Custom patterns (regex)
   custom_patterns:
@@ -45,6 +58,14 @@ prompt_guard:
     allowed:
       - "legitimate_use_case"
       - "known_safe_phrase"
+  
+  # HiveFence threat intelligence network
+  hivefence:
+    enabled: true
+    api_url: https://hivefence-api.seojoon-kim.workers.dev/api/v1
+    auto_report: true      # Report HIGH+ detections
+    auto_fetch: true       # Fetch patterns on startup
+    cache_path: ~/.clawdbot/hivefence_cache.json
   
   # Notification settings
   notifications:

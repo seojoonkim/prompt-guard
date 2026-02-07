@@ -1,1 +1,2 @@
 pyyaml>=5.0
+langdetect>=1.0.9  # optional: language detection for unsupported-language flagging
