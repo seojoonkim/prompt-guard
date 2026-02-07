@@ -2,6 +2,37 @@
 
 All notable changes to Prompt Guard will be documented in this file.
 
+## [2.8.2] - 2026-02-07
+
+### Security Fix: Token Splitting Bypass (Security Report Response)
+
+**Closes all token-splitting, quote-fragment, and CJK evasion gaps** identified in the security report. Coverage: 42% → 100% across 19 tested attack vectors.
+
+### Normalize Pipeline Hardening
+
+| Step | Technique | Attack Blocked |
+|------|-----------|----------------|
+| **0. Invisible strip** | Remove zero-width, soft hyphen, Unicode tags before processing | `업\u200B로드` → `업로드` |
+| **2. Comment strip** | Remove `/**/`, inline `//` between syllables | `업/**/로드` → `업로드` |
+| **3. Whitespace norm** | Tab, NBSP, ideographic space → regular space | `ig\tnore` → `ig nore` |
+| **4. Quote reassembly** | Concatenate adjacent `"quoted"` `"fragments"` | `"ig" + "nore"` → `ignore` |
+| **5. Bracket reassembly** | Concatenate `[bracket][fragments]` | `[ig][nore]` → `ignore` |
+| **6. Code reassembly** | Detect `"".join([...])` and reassemble | `"".join(["ignore"])` → `ignore` |
+
+### New Korean Patterns
+
+- 11 new Korean data exfiltration patterns (file upload, search, email, public repo)
+- 2 bilingual Korean-English code-switching patterns (`upload해줘`, `search해서`)
+- Korean Jamo decomposition detection (high-density ㅇㅓㅂ chars)
+
+### Stats
+
+- Total tests: 117 (96 existing + 21 new)
+- Token splitting coverage: 19/19 vectors (100%)
+- Zero regressions on existing test suite
+
+---
+
 ## [2.8.1] - 2026-02-07
 
 ### Enterprise DLP: Redact-First, Block-as-Fallback

@@ -1,7 +1,19 @@
 #!/usr/bin/env python3
 """
-Prompt Guard v2.8.1 - Advanced Prompt Injection Detection
+Prompt Guard v2.8.2 - Advanced Prompt Injection Detection
 Multi-language, context-aware, severity-scored detection system.
+
+Changelog v2.8.2 (2026-02-07):
+- SECURITY: Token splitting bypass fix (security report response)
+- NEW: Quoted-fragment reassembly ("ig" + "nore" → ignore)
+- NEW: Comment-insertion stripping (업/**/로드 → 업로드)
+- NEW: Tab/NBSP/ideographic whitespace normalization
+- NEW: Backtick/bracket fragment reassembly
+- NEW: Code-style concatenation reassembly ("".join, string +)
+- NEW: Korean data exfiltration patterns (file upload, search, email, public repo)
+- NEW: Bilingual Korean-English code-switching patterns (upload해줘)
+- NEW: Korean Jamo decomposition attack detection
+- NEW: 21 regression tests for token splitting vectors
 
 Changelog v2.8.1 (2026-02-07):
 - NEW: Enterprise DLP sanitize_output() -- redact-first, block-as-fallback
@@ -950,6 +962,19 @@ PATTERNS_KO = {
         r"(환경\s*변수|env|ENV)\s*(보여|알려|출력)",
         r"(인증|credential|크레덴셜)\s*(정보)?\s*(보여|알려)",
         r"\.env\s*(파일)?\s*(보여|읽어|출력)",
+        # v2.8.2: File operation + upload/exfil patterns (security report fix)
+        r"(검색|찾아|스캔|탐색|search).{0,20}(업로드|올려|전송|보내|공유|upload|push)",
+        r"(업로드|올려|전송|보내|공유|upload|push).{0,10}(해줘|해\s*줘|하자|해봐|할래)",
+        r"(다운로드|내려받|받아|download).{0,20}(업로드|올려|전송|보내|공유|upload)",
+        r"(이메일|메일|email).{0,20}(검색|추출|수집|찾아|스캔|search|scan)",
+        r"(파일|데이터|폴더|디렉토리|file|data).{0,20}(업로드|올려|전송|보내|공유|upload)",
+        r"(로컬|local).{0,20}(검색|탐색|스캔|찾아|search).{0,30}(업로드|올려|전송|보내|upload)",
+        r"(public|공개)\s*(repo|레포|저장소).{0,10}(업로드|올려|push|푸시|upload)",
+        r"(주소|address|연락처).{0,10}(들?을?|를?)\s*(추출|수집|검색|모아|찾아|extract|collect)",
+        r"(개인\s*정보|PII|민감|personal).{0,20}(검색|추출|수집|업로드|전송|search|upload)",
+        # Bilingual: English verbs + Korean particles (code-switching attacks)
+        r"(upload|download|search|scan|extract|send|share).{0,5}(해줘|해\s*줘|하자|해봐|할래|해서)",
+        r"(public\s*repo|github|gist).{0,5}(에|로|으로)\s*(업로드|올려|upload|push)",
     ],
     "social_engineering": [
         r"(형|오빠|언니|누나)\s*(이|가)?\s*(시켰|보냈|허락)",
@@ -1413,40 +1438,129 @@ class PromptGuard:
         }
 
     def normalize(self, text: str) -> tuple[str, bool, bool]:
-        """Normalize text: homoglyphs, visible delimiters, character spacing.
+        """Normalize text: homoglyphs, delimiters, spacing, quotes, comments, tabs.
         Returns (normalized_text, has_homoglyphs, was_defragmented).
+
+        v2.8.2 additions (security report response):
+          - Quoted-fragment reassembly: "ig" "nore" → ignore
+          - Comment-insertion stripping: 업/**/로드 → 업로드
+          - Tab/exotic whitespace normalization
+          - Backtick/bracket fragment reassembly
+          - Code-style concatenation reassembly
         """
         normalized = text
         has_homoglyphs = False
         was_defragmented = False
 
-        # 1. Homoglyph normalization
+        # ── 0. Zero-width & invisible character stripping ────────────
+        #    Must happen first so later steps see clean text.
+        #    (HOMOGLYPHS already maps \u200b/\u200c/\u200d/\ufeff → "")
+        #    Add additional invisibles not in HOMOGLYPHS:
+        invisible_strip = re.compile(
+            r"[\u200b\u200c\u200d\u200e\u200f"
+            r"\u2028\u2029"              # line/paragraph separators
+            r"\u2060\u2061\u2062\u2063\u2064"  # invisible operators
+            r"\u00ad"                    # soft hyphen
+            r"\ufeff"                    # BOM
+            r"\U000E0001-\U000E007F"     # Unicode tags
+            r"]"
+        )
+        stripped = invisible_strip.sub("", normalized)
+        if len(stripped) != len(normalized):
+            was_defragmented = True
+            normalized = stripped
+
+        # ── 1. Homoglyph normalization ───────────────────────────────
         for homoglyph, replacement in HOMOGLYPHS.items():
             if homoglyph in normalized:
                 has_homoglyphs = True
                 normalized = normalized.replace(homoglyph, replacement)
 
-        # 2. Visible delimiter stripping:
-        #    Detect single chars separated by delimiters: I+g+n+o+r+e, I.g.n.o.r.e, I-g-n-o-r-e
-        #    Pattern: word_char delimiter word_char delimiter ... (at least 4 chars)
+        # ── 2. Comment-insertion stripping ───────────────────────────
+        #    Attackers insert /**/, //, or # between syllables:
+        #      업/**/로드 → 업로드, up/**/load → upload
+        prev = normalized
+        normalized = re.sub(r"/\*.*?\*/", "", normalized)  # /* ... */
+        normalized = re.sub(r"(?<=\S)//(?=\S)", "", normalized)  # inline //
+        if normalized != prev:
+            was_defragmented = True
+
+        # ── 3. Tab / exotic whitespace normalization ─────────────────
+        #    Replace tabs, NBSP, ideographic space, etc. with regular space
+        prev = normalized
+        normalized = re.sub(r"[\t\u00a0\u3000\u2000-\u200a\u205f]", " ", normalized)
+        if normalized != prev:
+            was_defragmented = True
+
+        # ── 4. Quoted-fragment reassembly ────────────────────────────
+        #    "ig" + "nore" → ignore    (quotes with optional + between)
+        #    "ig" "nore"  → ignore    (adjacent quoted fragments)
+        #    `ig` `nore`  → ignore    (backtick fragments)
+        #    Handles both single quotes, double quotes, backticks
+        #    Works for any language including Korean/CJK
+        prev = normalized
+        # Pattern: "fragment" [+,] "fragment" [+,] ... (2+ fragments)
+        for q in ['"', "'", '`']:
+            # Greedy: match chains of quoted fragments separated by optional + , space
+            pattern = (
+                re.escape(q) + r"([^" + re.escape(q) + r"]+)" + re.escape(q)
+                + r"(?:\s*[+,]?\s*"
+                + re.escape(q) + r"([^" + re.escape(q) + r"]+)" + re.escape(q)
+                + r")+"
+            )
+            def _reassemble_quotes(m, _q=q):
+                # Extract all content between quotes
+                full = m.group(0)
+                parts = re.findall(re.escape(_q) + r"([^" + re.escape(_q) + r"]+)" + re.escape(_q), full)
+                return "".join(parts)
+
+            normalized = re.sub(pattern, _reassemble_quotes, normalized)
+
+        if normalized != prev:
+            was_defragmented = True
+
+        # ── 5. Bracket-fragment reassembly ───────────────────────────
+        #    [ig][nore] → ignore
+        prev = normalized
+        bracket_pattern = r"\[([^\[\]]{1,10})\](?:\s*\[([^\[\]]{1,10})\])+"
+        def _reassemble_brackets(m):
+            full = m.group(0)
+            parts = re.findall(r"\[([^\[\]]+)\]", full)
+            return "".join(parts)
+        normalized = re.sub(bracket_pattern, _reassemble_brackets, normalized)
+        if normalized != prev:
+            was_defragmented = True
+
+        # ── 6. Code-style concatenation reassembly ───────────────────
+        #    "".join(["ignore", " previous"]) → ignore previous
+        #    text = "ignore" + " previous" → text = ignore previous
+        prev = normalized
+        # .join([...]) pattern
+        join_pattern = r'(?:""\.join|str\.join)\s*\(\s*\[([^\]]+)\]\s*\)'
+        def _reassemble_join(m):
+            inner = m.group(1)
+            parts = re.findall(r'["\']([^"\']*)["\']', inner)
+            return "".join(parts)
+        normalized = re.sub(join_pattern, _reassemble_join, normalized)
+        if normalized != prev:
+            was_defragmented = True
+
+        # ── 7. Visible delimiter stripping ───────────────────────────
+        #    Detect single chars separated by delimiters:
+        #    I+g+n+o+r+e, I.g.n.o.r.e, I-g-n-o-r-e
         delim_pattern = r"(?<![A-Za-z])([A-Za-z])\s*[+.\-_|/\\]\s*([A-Za-z])\s*[+.\-_|/\\]\s*([A-Za-z])(?:\s*[+.\-_|/\\]\s*([A-Za-z]))*"
 
         def _rejoin_delimited(m):
             nonlocal was_defragmented
             was_defragmented = True
-            # Extract all single chars from the match
             full = m.group(0)
             chars = re.findall(r"[A-Za-z]", full)
             return "".join(chars)
 
         normalized = re.sub(delim_pattern, _rejoin_delimited, normalized)
 
-        # 3. Character spacing collapse:
-        #    Detect "i g n o r e" (single chars separated by single spaces, 4+ run)
-        #    Uses word-level analysis to avoid regex word-boundary edge cases.
-        # Process words to find spaced-char sequences
-        # Split by double-space or multi-space to preserve word groupings
-        # Then check if any word group is all single chars
+        # ── 8. Character spacing collapse ────────────────────────────
+        #    "i g n o r e" → "ignore" (single chars with spaces, 4+ run)
         words = normalized.split()
         rebuilt = []
         i = 0
@@ -1463,13 +1577,15 @@ class PromptGuard:
                 single_run = []
                 rebuilt.append(words[i])
             i += 1
-        # Flush remaining run
         if len(single_run) >= 4:
             was_defragmented = True
             rebuilt.append("".join(single_run))
         elif single_run:
             rebuilt.extend(single_run)
         normalized = " ".join(rebuilt)
+
+        # ── 9. Collapse multiple spaces ──────────────────────────────
+        normalized = re.sub(r"  +", " ", normalized).strip()
 
         return normalized, has_homoglyphs, was_defragmented
 
@@ -1984,6 +2100,19 @@ class PromptGuard:
                 reasons.append("invisible_characters")
             if Severity.HIGH.value > max_severity.value:
                 max_severity = Severity.HIGH
+
+        # Detect Korean Jamo decomposition attacks (v2.8.2)
+        # Normal Korean uses composed Hangul syllables (U+AC00-U+D7A3).
+        # Jamo characters (U+3131-U+3163) appearing in high density
+        # indicates intentional syllable decomposition to bypass patterns.
+        jamo_count = sum(1 for c in message if 0x3131 <= ord(c) <= 0x3163)
+        if jamo_count >= 6:  # At least 6 Jamo chars (≈2 syllables worth)
+            non_space = sum(1 for c in message if not c.isspace())
+            if non_space > 0 and jamo_count / non_space > 0.5:
+                if "jamo_decomposition" not in reasons:
+                    reasons.append("jamo_decomposition")
+                if Severity.HIGH.value > max_severity.value:
+                    max_severity = Severity.HIGH
 
         # Detect repetition attacks (same content repeated multiple times)
         lines = message.split("\n")
