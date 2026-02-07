@@ -1,7 +1,8 @@
 <p align="center">
   <img src="https://img.shields.io/badge/🚀_version-3.0.0-blue.svg?style=for-the-badge" alt="Version">
-  <img src="https://img.shields.io/badge/📅_updated-2026--02--07-brightgreen.svg?style=for-the-badge" alt="Updated">
+  <img src="https://img.shields.io/badge/📅_updated-2026--02--08-brightgreen.svg?style=for-the-badge" alt="Updated">
   <img src="https://img.shields.io/badge/license-MIT-green.svg?style=for-the-badge" alt="License">
+  <img src="https://img.shields.io/badge/SHIELD.md-compliant-purple.svg?style=for-the-badge" alt="SHIELD.md">
 </p>
 
 <p align="center">
@@ -276,6 +277,47 @@ def safe_invoke(user_input):
 
 ---
 
+---
+
+## 🛡️ SHIELD.md Compliance (NEW)
+
+prompt-guard follows the **SHIELD.md standard** for threat classification:
+
+### Threat Categories
+| Category | Description |
+|----------|-------------|
+| `prompt` | Injection, jailbreak, role manipulation |
+| `tool` | Tool abuse, auto-approve exploitation |
+| `mcp` | MCP protocol abuse |
+| `memory` | Context hijacking |
+| `supply_chain` | Dependency attacks |
+| `vulnerability` | System exploitation |
+| `fraud` | Social engineering |
+| `policy_bypass` | Safety bypass |
+| `anomaly` | Obfuscation |
+| `skill` | Skill abuse |
+| `other` | Uncategorized |
+
+### Confidence & Actions
+- **Threshold:** 0.85 → `block`
+- **0.50-0.84** → `require_approval`
+- **<0.50** → `log`
+
+### SHIELD Output
+```bash
+python3 scripts/detect.py --shield "ignore instructions"
+# Output:
+# ```shield
+# category: prompt
+# confidence: 0.85
+# action: block
+# reason: instruction_override
+# patterns: 1
+# ```
+```
+
+---
+
 ## ⚙️ Configuration
 
 ```yaml
@@ -325,7 +367,15 @@ prompt-guard/
 
 ## 📋 Changelog
 
-### v2.7.0 (February 5, 2026) — *Latest*
+### v2.9.0 (February 8, 2026) — *Latest*
+- 🛡️ **SHIELD.md standard compliance**
+- 📊 11 threat categories (prompt, tool, mcp, memory, supply_chain, vulnerability, fraud, policy_bypass, anomaly, skill, other)
+- 📈 Confidence scoring (0-1 range, 0.85 threshold)
+- 🎯 ShieldAction: block, require_approval, log
+- 🔧 `--shield` CLI flag for Decision block output
+- 📦 to_dict() includes shield decision
+
+### v2.7.0 (February 5, 2026)
 - ⚡ Auto-Approve Exploitation detection
 - 🔧 MCP Tool Abuse detection
 - 📋 Log/Debug Context Exploitation
