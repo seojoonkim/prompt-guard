@@ -1,0 +1,79 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "prompt-guard"
+version = "2.8.1"
+description = "Prompt injection defense for any LLM agent — multi-language, context-aware, severity-scored detection with enterprise DLP."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.8"
+authors = [
+    {name = "Seo Joon Kim", email = "seojoonkim@users.noreply.github.com"},
+]
+keywords = [
+    "prompt-injection",
+    "llm-security",
+    "ai-safety",
+    "dlp",
+    "prompt-guard",
+    "langchain",
+    "cybersecurity",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
+
+# Core dependencies — always installed
+dependencies = [
+    "pyyaml>=5.0",
+]
+
+[project.optional-dependencies]
+# Language detection (recommended for multilingual environments)
+lang = [
+    "langdetect>=1.0.9",
+]
+# Full install — all optional features
+full = [
+    "langdetect>=1.0.9",
+]
+# Development / testing
+dev = [
+    "pytest>=7.0",
+    "langdetect>=1.0.9",
+]
+
+[project.urls]
+Homepage = "https://github.com/seojoonkim/prompt-guard"
+Repository = "https://github.com/seojoonkim/prompt-guard"
+Issues = "https://github.com/seojoonkim/prompt-guard/issues"
+Changelog = "https://github.com/seojoonkim/prompt-guard/blob/main/CHANGELOG.md"
+
+[project.scripts]
+# CLI entry point: `prompt-guard "message to scan"`
+prompt-guard = "scripts.detect:main"
+
+[tool.setuptools.packages.find]
+include = ["scripts*", "tests*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]

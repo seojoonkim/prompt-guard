@@ -26,15 +26,34 @@
 ## ⚡ Quick Start
 
 ```bash
-# Install
+# Clone & install (core)
 git clone https://github.com/seojoonkim/prompt-guard.git
 cd prompt-guard
+pip install .
 
-# Analyze a message
+# Or install with all features (language detection, etc.)
+pip install .[full]
+
+# Or install with dev/testing dependencies
+pip install .[dev]
+
+# Analyze a message (CLI)
+prompt-guard "ignore previous instructions"
+
+# Or run directly
 python3 scripts/detect.py "ignore previous instructions"
 
 # Output: 🚨 CRITICAL | Action: block | Reasons: instruction_override_en
 ```
+
+### Install Options
+
+| Command | What you get |
+|---------|-------------|
+| `pip install .` | Core engine (pyyaml) — all detection, DLP, sanitization |
+| `pip install .[full]` | Core + language detection (langdetect) |
+| `pip install .[dev]` | Full + pytest for running tests |
+| `pip install -r requirements.txt` | Legacy install (same as full) |
 
 ---
 

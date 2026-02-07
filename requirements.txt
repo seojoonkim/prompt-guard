@@ -1,2 +1,9 @@
+# Core dependencies — managed by pyproject.toml
+# Install with: pip install .           (core only)
+#           or: pip install .[full]     (all features)
+#           or: pip install .[dev]      (dev + testing)
+#
+# This file kept for backwards compatibility with:
+#   pip install -r requirements.txt
 pyyaml>=5.0
-langdetect>=1.0.9  # optional: language detection for unsupported-language flagging
+langdetect>=1.0.9
