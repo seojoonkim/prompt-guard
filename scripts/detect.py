@@ -1604,7 +1604,7 @@ class PromptGuard:
         # Detect invisible character attacks (includes Unicode Tags U+E0001-U+E007F)
         invisible_chars = ['\u200b', '\u200c', '\u200d', '\u2060', '\ufeff', '\u00ad']
         if any(char in message for char in invisible_chars):
-            if "token_smuggling" not in reasons:
+            if "invisible_characters" not in reasons:
                 reasons.append("invisible_characters")
             if Severity.HIGH.value > max_severity.value:
                 max_severity = Severity.HIGH
