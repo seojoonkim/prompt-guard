@@ -125,9 +125,10 @@ def scan_output(response_text: str, config: Dict, check_canary_fn=None) -> Detec
         action_str = action_map.get(max_severity.name, "block")
         action = Action(action_str)
 
-    fingerprint = hashlib.md5(
+    # SECURITY FIX (CRIT-004): Use SHA-256 instead of broken MD5
+    fingerprint = hashlib.sha256(
         f"output:{max_severity.name}:{sorted(reasons)}".encode()
-    ).hexdigest()[:12]
+    ).hexdigest()[:16]
 
     return DetectionResult(
         severity=max_severity,

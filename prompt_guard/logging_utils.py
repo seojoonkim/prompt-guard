@@ -29,8 +29,9 @@ def log_detection(config: Dict, result: DetectionResult, message: str, context: 
     date_str = now.strftime("%Y-%m-%d")
     time_str = now.strftime("%H:%M:%S")
 
-    user_id = context.get("user_id", "unknown")
-    chat_name = context.get("chat_name", "unknown")
+    # SECURITY FIX (MED-006): Sanitize user-controlled data for log injection
+    user_id = str(context.get("user_id", "unknown")).replace("|", "_").replace("\n", " ")[:50]
+    chat_name = str(context.get("chat_name", "unknown")).replace("|", "_").replace("\n", " ")[:50]
 
     # Check if we need to add date header
     add_date_header = True
@@ -117,7 +118,8 @@ def log_detection_json(config: Dict, result: DetectionResult, message: str, cont
                 pass
         entry["prev_hash"] = prev_hash
         entry_str = json.dumps(entry, sort_keys=True, ensure_ascii=False)
-        entry["entry_hash"] = hashlib.sha256(entry_str.encode()).hexdigest()[:24]
+        # SECURITY FIX (CRIT-005): Use full SHA-256 hash for tamper detection
+        entry["entry_hash"] = hashlib.sha256(entry_str.encode()).hexdigest()
 
     with open(json_path, "a") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
@@ -145,7 +147,8 @@ def report_to_hivefence(config: Dict, result: DetectionResult, message: str, con
         import urllib.error
 
         # Generate pattern hash (privacy-preserving)
-        pattern_hash = f"sha256:{hashlib.sha256(message.encode()).hexdigest()[:16]}"
+        # SECURITY FIX (HIGH-008): Use 32 hex chars (128 bits) to prevent brute-force
+        pattern_hash = f"sha256:{hashlib.sha256(message.encode()).hexdigest()[:32]}"
 
         # Determine category from first matched pattern
         category = "other"

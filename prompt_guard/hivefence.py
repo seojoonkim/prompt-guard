@@ -30,7 +30,7 @@ import urllib.request
 import urllib.error
 from typing import Optional, Dict, List, Any
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 API_BASE = "https://hivefence-api.seojoon-kim.workers.dev/api/v1"
 
@@ -71,7 +71,7 @@ class HiveFenceClient:
         
         headers = {
             "Content-Type": "application/json",
-            "User-Agent": "prompt-guard/2.6.0"
+            "User-Agent": "prompt-guard/3.0.0"
         }
         
         body = json.dumps(data).encode("utf-8") if data else None
@@ -230,7 +230,7 @@ class HiveFenceClient:
                 os.makedirs(cache_dir, mode=0o700)
             
             data = {
-                "updated_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
                 "patterns": [
                     {
                         "id": p.id,

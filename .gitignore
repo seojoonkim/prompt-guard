@@ -21,6 +21,9 @@ memory/
 # Config with secrets
 config.yaml
 
+# Security audit reports (confidential)
+SECURITY_AUDIT_*.md
+
 # OS
 .DS_Store
 Thumbs.db

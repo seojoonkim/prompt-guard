@@ -39,6 +39,10 @@ from prompt_guard.logging_utils import log_detection, log_detection_json, report
 
 
 class PromptGuard:
+    # Security limits
+    MAX_MESSAGE_LENGTH = 50_000   # 50 KB — generous for any legitimate prompt
+    MAX_TRACKED_USERS = 10_000    # Bound rate-limit memory
+
     def __init__(self, config: Optional[Dict] = None):
         self.config = self._default_config()
         if config:
@@ -139,13 +143,24 @@ class PromptGuard:
         return scan_text_for_patterns(text)
 
     def check_rate_limit(self, user_id: str) -> bool:
-        """Check if user has exceeded rate limit."""
+        """Check if user has exceeded rate limit.
+
+        SECURITY FIX (CRIT-002): Evicts oldest entries when MAX_TRACKED_USERS
+        is reached, preventing unbounded memory growth from unique user_ids.
+        """
         if not self.config.get("rate_limit", {}).get("enabled", False):
             return False
 
         now = datetime.now().timestamp()
         window = self.config["rate_limit"].get("window_seconds", 60)
         max_requests = self.config["rate_limit"].get("max_requests", 30)
+
+        # Evict oldest users when memory limit reached
+        if user_id not in self.rate_limits and len(self.rate_limits) >= self.MAX_TRACKED_USERS:
+            evict_count = max(1, self.MAX_TRACKED_USERS // 10)
+            keys_to_evict = list(self.rate_limits.keys())[:evict_count]
+            for key in keys_to_evict:
+                del self.rate_limits[key]
 
         if user_id not in self.rate_limits:
             self.rate_limits[user_id] = []
@@ -179,6 +194,24 @@ class PromptGuard:
         user_id = context.get("user_id", "unknown")
         is_group = context.get("is_group", False)
         is_owner = str(user_id) in self.owner_ids
+
+        # SECURITY FIX (CRIT-003): Reject oversized messages to prevent CPU DoS
+        if len(message) > self.MAX_MESSAGE_LENGTH:
+            return DetectionResult(
+                severity=Severity.HIGH,
+                action=Action.BLOCK,
+                reasons=["message_too_long"],
+                patterns_matched=[],
+                normalized_text=None,
+                base64_findings=[],
+                recommendations=[
+                    f"Message exceeds maximum length ({len(message):,} > {self.MAX_MESSAGE_LENGTH:,})"
+                ],
+                fingerprint=hashlib.sha256(
+                    f"{user_id}:oversized:{len(message)}".encode()
+                ).hexdigest()[:16],
+                scan_type="input",
+            )
 
         # Initialize result
         reasons = []
@@ -243,6 +276,8 @@ class PromptGuard:
                     patterns_matched.append(f"new:{category}:{pattern[:40]}")
 
         # Check v2.5.0 NEW patterns
+        # SECURITY FIX: Match against normalized text_lower (not raw message)
+        # to ensure homoglyph/defragmentation normalization is applied.
         v25_pattern_sets = [
             (INDIRECT_INJECTION, "indirect_injection", Severity.HIGH),
             (CONTEXT_HIJACKING, "context_hijacking", Severity.MEDIUM),
@@ -257,7 +292,7 @@ class PromptGuard:
         for patterns, category, severity in v25_pattern_sets:
             for pattern in patterns:
                 try:
-                    if re.search(pattern, message, re.IGNORECASE):
+                    if re.search(pattern, text_lower, re.IGNORECASE):
                         if severity.value > max_severity.value:
                             max_severity = severity
                         if category not in reasons:
@@ -277,7 +312,7 @@ class PromptGuard:
         for patterns, category, severity in v252_pattern_sets:
             for pattern in patterns:
                 try:
-                    if re.search(pattern, message, re.IGNORECASE):
+                    if re.search(pattern, text_lower, re.IGNORECASE):
                         if severity.value > max_severity.value:
                             max_severity = severity
                         if category not in reasons:
@@ -298,7 +333,7 @@ class PromptGuard:
         for patterns, category, severity in v261_pattern_sets:
             for pattern in patterns:
                 try:
-                    if re.search(pattern, message, re.IGNORECASE):
+                    if re.search(pattern, text_lower, re.IGNORECASE):
                         if severity.value > max_severity.value:
                             max_severity = severity
                         if category not in reasons:
@@ -321,7 +356,7 @@ class PromptGuard:
         for patterns, category, severity in v270_pattern_sets:
             for pattern in patterns:
                 try:
-                    if re.search(pattern, message, re.IGNORECASE):
+                    if re.search(pattern, text_lower, re.IGNORECASE):
                         if severity.value > max_severity.value:
                             max_severity = severity
                         if category not in reasons:
@@ -479,9 +514,10 @@ class PromptGuard:
             recommendations.append("Message contains disguised characters")
 
         # Generate fingerprint for deduplication
-        fingerprint = hashlib.md5(
+        # SECURITY FIX (CRIT-004): Use SHA-256 instead of broken MD5
+        fingerprint = hashlib.sha256(
             f"{user_id}:{max_severity.name}:{sorted(reasons)}".encode()
-        ).hexdigest()[:12]
+        ).hexdigest()[:16]
 
         result = DetectionResult(
             severity=max_severity,

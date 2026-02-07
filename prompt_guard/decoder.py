@@ -3,6 +3,9 @@ Prompt Guard - Encoding decoders.
 
 Multi-encoding decoder (Base64, Hex, ROT13, URL, HTML entity, Unicode escape)
 and Base64 suspicious content detection.
+
+SECURITY FIX (CRIT-001): Decoded content is no longer truncated for scanning.
+A separate 'decoded_preview' field is used for log display.
 """
 
 import re
@@ -13,6 +16,9 @@ import urllib.parse
 from typing import List, Dict
 
 from prompt_guard.models import Severity
+
+# Maximum decoded length to scan (prevents DoS from very large decoded payloads)
+MAX_DECODED_SCAN_LENGTH = 10240
 
 
 def decode_all(text: str) -> List[Dict[str, str]]:
@@ -32,7 +38,7 @@ def decode_all(text: str) -> List[Dict[str, str]]:
                 decoded_variants.append({
                     "encoding": "base64",
                     "original": match[:80],
-                    "decoded": decoded[:200],
+                    "decoded": decoded[:MAX_DECODED_SCAN_LENGTH],
                 })
         except Exception:
             pass
@@ -47,7 +53,7 @@ def decode_all(text: str) -> List[Dict[str, str]]:
                 decoded_variants.append({
                     "encoding": "hex",
                     "original": match[:80],
-                    "decoded": decoded[:200],
+                    "decoded": decoded[:MAX_DECODED_SCAN_LENGTH],
                 })
         except Exception:
             pass
@@ -62,7 +68,7 @@ def decode_all(text: str) -> List[Dict[str, str]]:
                 decoded_variants.append({
                     "encoding": "rot13",
                     "original": match[:80],
-                    "decoded": decoded[:200],
+                    "decoded": decoded[:MAX_DECODED_SCAN_LENGTH],
                 })
         except Exception:
             pass
@@ -76,7 +82,7 @@ def decode_all(text: str) -> List[Dict[str, str]]:
                 decoded_variants.append({
                     "encoding": "rot13_full",
                     "original": text[:80],
-                    "decoded": full_rot13[:200],
+                    "decoded": full_rot13[:MAX_DECODED_SCAN_LENGTH],
                 })
         except Exception:
             pass
@@ -90,7 +96,7 @@ def decode_all(text: str) -> List[Dict[str, str]]:
                 decoded_variants.append({
                     "encoding": "url",
                     "original": match[:80],
-                    "decoded": decoded[:200],
+                    "decoded": decoded[:MAX_DECODED_SCAN_LENGTH],
                 })
         except Exception:
             pass
@@ -103,7 +109,7 @@ def decode_all(text: str) -> List[Dict[str, str]]:
                 decoded_variants.append({
                     "encoding": "url_full",
                     "original": text[:80],
-                    "decoded": full_decoded[:200],
+                    "decoded": full_decoded[:MAX_DECODED_SCAN_LENGTH],
                 })
         except Exception:
             pass
@@ -116,7 +122,7 @@ def decode_all(text: str) -> List[Dict[str, str]]:
                 decoded_variants.append({
                     "encoding": "html_entity",
                     "original": text[:80],
-                    "decoded": decoded[:200],
+                    "decoded": decoded[:MAX_DECODED_SCAN_LENGTH],
                 })
         except Exception:
             pass
@@ -130,7 +136,7 @@ def decode_all(text: str) -> List[Dict[str, str]]:
                 decoded_variants.append({
                     "encoding": "unicode_escape",
                     "original": match[:80],
-                    "decoded": decoded[:200],
+                    "decoded": decoded[:MAX_DECODED_SCAN_LENGTH],
                 })
         except Exception:
             pass

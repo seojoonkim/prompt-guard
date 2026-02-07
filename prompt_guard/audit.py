@@ -145,7 +145,7 @@ class SecurityAudit:
         try:
             with open(config_path) as f:
                 config = json.load(f)
-        except:
+        except (json.JSONDecodeError, IOError, OSError):
             return True
         
         telegram = config.get('channels', {}).get('telegram', {})

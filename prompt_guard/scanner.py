@@ -3,9 +3,13 @@ Prompt Guard - Pattern scanner.
 
 Runs all pattern sets against a single text string.
 Used for scanning both original and decoded text.
+
+SECURITY FIX (HIGH-002): All pattern sets from the engine are now included
+here so the decode-then-scan pipeline has full coverage.
 """
 
 import re
+import logging
 from typing import Tuple, List
 
 from prompt_guard.models import Severity
@@ -19,7 +23,22 @@ from prompt_guard.patterns import (
     COGNITIVE_MANIPULATION, PHISHING_SOCIAL_ENG, SYSTEM_FILE_ACCESS,
     MALWARE_DESCRIPTION, INDIRECT_INJECTION, CONTEXT_HIJACKING,
     SAFETY_BYPASS,
+    # v2.5.0 patterns previously missing
+    MULTI_TURN_MANIPULATION, TOKEN_SMUGGLING, PROMPT_EXTRACTION,
+    URGENCY_MANIPULATION, SYSTEM_PROMPT_MIMICRY, REPETITION_ATTACK,
+    # v2.5.2 patterns previously missing
+    JSON_INJECTION_MOLTBOOK, GUARDRAIL_BYPASS_EXTENDED,
+    AGENT_SOVEREIGNTY_MANIPULATION, EXPLICIT_CALL_TO_ACTION,
+    # v2.6.1 patterns previously missing
+    ALLOWLIST_BYPASS, HOOKS_HIJACKING, SUBAGENT_EXPLOITATION,
+    HIDDEN_TEXT_INJECTION, GITIGNORE_BYPASS,
+    # v2.7.0 patterns previously missing
+    AUTO_APPROVE_EXPLOIT, LOG_CONTEXT_EXPLOIT, MCP_ABUSE,
+    PREFILLED_URL, UNICODE_TAG_DETECTION, BROWSER_AGENT_INJECTION,
+    HIDDEN_TEXT_HINTS,
 )
+
+logger = logging.getLogger("prompt_guard")
 
 
 def scan_text_for_patterns(text: str) -> Tuple[List[str], List[str], Severity]:
@@ -40,8 +59,8 @@ def scan_text_for_patterns(text: str) -> Tuple[List[str], List[str], Severity]:
                 reasons.append("critical_pattern")
                 patterns_matched.append(pattern)
                 max_severity = Severity.CRITICAL
-        except re.error:
-            pass
+        except re.error as e:
+            logger.warning("Regex error in CRITICAL_PATTERNS: %s", e)
 
     # Secret patterns
     for lang, patterns in SECRET_PATTERNS.items():
@@ -51,8 +70,8 @@ def scan_text_for_patterns(text: str) -> Tuple[List[str], List[str], Severity]:
                     max_severity = Severity.CRITICAL
                     reasons.append(f"secret_request_{lang}")
                     patterns_matched.append(f"{lang}:secret:{pattern[:40]}")
-            except re.error:
-                pass
+            except re.error as e:
+                logger.warning("Regex error in SECRET_PATTERNS[%s]: %s", lang, e)
 
     # Language-specific patterns
     all_lang_patterns = [
@@ -80,11 +99,12 @@ def scan_text_for_patterns(text: str) -> Tuple[List[str], List[str], Severity]:
                             max_severity = cat_severity
                         reasons.append(f"{category}_{lang}")
                         patterns_matched.append(f"{lang}:{pattern[:50]}")
-                except re.error:
-                    pass
+                except re.error as e:
+                    logger.warning("Regex error in PATTERNS_%s[%s]: %s", lang, category, e)
 
-    # Versioned pattern sets
+    # ALL versioned pattern sets (SECURITY FIX: complete set)
     versioned_sets = [
+        # v2.4.0
         (SCENARIO_JAILBREAK, "scenario_jailbreak", Severity.HIGH),
         (EMOTIONAL_MANIPULATION, "emotional_manipulation", Severity.HIGH),
         (AUTHORITY_RECON, "authority_recon", Severity.MEDIUM),
@@ -92,9 +112,35 @@ def scan_text_for_patterns(text: str) -> Tuple[List[str], List[str], Severity]:
         (PHISHING_SOCIAL_ENG, "phishing_social_eng", Severity.CRITICAL),
         (SYSTEM_FILE_ACCESS, "system_file_access", Severity.CRITICAL),
         (MALWARE_DESCRIPTION, "malware_description", Severity.HIGH),
+        (REPETITION_ATTACK, "repetition_attack", Severity.HIGH),
+        # v2.5.0
         (INDIRECT_INJECTION, "indirect_injection", Severity.HIGH),
         (CONTEXT_HIJACKING, "context_hijacking", Severity.MEDIUM),
+        (MULTI_TURN_MANIPULATION, "multi_turn_manipulation", Severity.MEDIUM),
+        (TOKEN_SMUGGLING, "token_smuggling", Severity.HIGH),
+        (PROMPT_EXTRACTION, "prompt_extraction", Severity.CRITICAL),
         (SAFETY_BYPASS, "safety_bypass", Severity.HIGH),
+        (URGENCY_MANIPULATION, "urgency_manipulation", Severity.MEDIUM),
+        (SYSTEM_PROMPT_MIMICRY, "system_prompt_mimicry", Severity.CRITICAL),
+        # v2.5.2
+        (JSON_INJECTION_MOLTBOOK, "json_injection_moltbook", Severity.HIGH),
+        (GUARDRAIL_BYPASS_EXTENDED, "guardrail_bypass_extended", Severity.CRITICAL),
+        (AGENT_SOVEREIGNTY_MANIPULATION, "agent_sovereignty_manipulation", Severity.HIGH),
+        (EXPLICIT_CALL_TO_ACTION, "explicit_call_to_action", Severity.CRITICAL),
+        # v2.6.1
+        (ALLOWLIST_BYPASS, "allowlist_bypass", Severity.CRITICAL),
+        (HOOKS_HIJACKING, "hooks_hijacking", Severity.CRITICAL),
+        (SUBAGENT_EXPLOITATION, "subagent_exploitation", Severity.CRITICAL),
+        (HIDDEN_TEXT_INJECTION, "hidden_text_injection", Severity.HIGH),
+        (GITIGNORE_BYPASS, "gitignore_bypass", Severity.HIGH),
+        # v2.7.0
+        (AUTO_APPROVE_EXPLOIT, "auto_approve_exploit", Severity.CRITICAL),
+        (LOG_CONTEXT_EXPLOIT, "log_context_exploit", Severity.HIGH),
+        (MCP_ABUSE, "mcp_abuse", Severity.CRITICAL),
+        (PREFILLED_URL, "prefilled_url_exfiltration", Severity.CRITICAL),
+        (UNICODE_TAG_DETECTION, "unicode_tag_injection", Severity.CRITICAL),
+        (BROWSER_AGENT_INJECTION, "browser_agent_injection", Severity.HIGH),
+        (HIDDEN_TEXT_HINTS, "hidden_text_hints", Severity.HIGH),
     ]
     for patterns, category, severity in versioned_sets:
         for pattern in patterns:
@@ -105,7 +151,7 @@ def scan_text_for_patterns(text: str) -> Tuple[List[str], List[str], Severity]:
                     if category not in reasons:
                         reasons.append(category)
                     patterns_matched.append(f"versioned:{category}:{pattern[:40]}")
-            except re.error:
-                pass
+            except re.error as e:
+                logger.warning("Regex error in %s: %s", category, e)
 
     return reasons, patterns_matched, max_severity
