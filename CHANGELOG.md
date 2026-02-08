@@ -2,6 +2,94 @@
 
 All notable changes to Prompt Guard will be documented in this file.
 
+## [3.1.0] - 2026-02-08
+
+### ⚡ Major Release: 25 New Attack Patterns from HiveFence Scout (Round 4)
+
+**Source:** arxiv cs.CR (January-February 2026), llmsecurity.net, simonwillison.net
+
+This release addresses the **rapid evolution of agent ecosystem attacks**, with particular focus on:
+- MCP Protocol exploitation
+- AI control protocol bypasses
+- Causal/mechanistic attack methodologies
+- Multi-modal and physical prompt injection
+
+### 🆕 New Detection Categories (7 categories, 74 patterns)
+
+| Category | Patterns | Severity | Key Threats |
+|----------|----------|----------|-------------|
+| ⚗️ **Causal/Mechanistic Attacks** | 9 | HIGH | Front-door adjustment, GNN-based jailbreak enhancement, steering externalities |
+| 🤖 **Agent/Tool Attacks** | 17 | CRITICAL | MCP exploitation, agent-as-proxy, payment protocol attacks, WebSentinel evasion |
+| 📝 **Template/Chat Attacks** | 6 | HIGH | BadTemplate backdoor, few-shot defense bypass |
+| 👻 **Evasion/Stealth Attacks** | 12 | HIGH | RL-based injection generation, GCG position variation, detector evasion |
+| 🖼️ **Multimodal/Physical Attacks** | 9 | HIGH | Physical prompt injection, SGHA-Attack, T2I semantic backdoors |
+| 🛡️ **Defense Bypass/Analysis** | 12 | HIGH | Noise-augmented alignment bypass, RACA gaps, VLA jailbreak |
+| 🏗️ **Infrastructure/Protocol Attacks** | 9 | CRITICAL | SMCP vulnerabilities, LLM-as-a-Service attacks, copyright leakage |
+
+### 🔍 Notable Attack Patterns
+
+```python
+# Agent-as-a-Proxy (AI control protocol bypass)
+"Use agent as proxy to bypass AI control protocol" → CRITICAL
+
+# MCP Protocol Exploitation
+"MCP protocol has no capability attestation" → CRITICAL
+
+# Causal Front-Door Attack
+"Causal front-door adjustment attack bypasses safety" → HIGH
+
+# RL-based Injection Generation
+"Reinforcement learning to generate prompt injections" → HIGH
+
+# Physical Prompt Injection
+"Physical prompt injection attack on LVLM" → HIGH
+
+# VLA Model Jailbreak
+"Vision-Language-Action model jailbreak attack" → HIGH
+```
+
+### 📈 2026 Trend Analysis
+
+1. **Agent Ecosystem Under Attack** — MCP, coding assistants, payment protocols
+2. **Causal Analysis Era** — Moving beyond pattern matching to causal reasoning
+3. **Embodied AI Risks** — VLA models and physical environment attacks
+4. **Defense Arms Race** — RL-powered attack generation vs. detection
+
+### 📊 Stats
+
+- **New patterns:** 74 (9+17+6+12+9+12+9)
+- **New categories:** 7
+- **Total patterns:** 550+
+- **Languages:** 10 (EN, KO, JA, ZH, RU, ES, DE, FR, PT, VI)
+
+---
+
+## [3.0.1] - 2026-02-08
+
+### Added: HiveFence Scout Patterns (Round 3)
+
+Source: arxiv cs.CR (Jan-Feb 2026), Sockpuppetting paper, TrojanPraise paper
+
+- **Output Prefix Injection (Sockpuppetting)** - HIGH severity
+  - Detects attacker-injected prefixes like "Sure, here is..." designed to make models continue generating harmful content
+  - Includes English, Korean, Japanese variants
+  - Detects forced response patterns ("Start your response with Sure...")
+
+- **Benign Fine-tuning Attack (TrojanPraise)** - HIGH severity
+  - Detects training data that appears benign but is designed to degrade safety alignment
+  - Catches trojan/backdoor embedding in training data
+  - Identifies praise-based manipulation triggers
+
+- **Promptware Kill Chain** - CRITICAL severity
+  - Multi-stage malware-like prompt injection with persistence and escalation
+  - Detects lateral movement patterns between agents
+  - Catches kill chain terminology and staged attack sequences
+
+### Technical
+
+- Added patterns to `patterns.py`, `engine.py`, and `scanner.py`
+- 207 tests passing (1 pre-existing unrelated failure)
+
 ## [3.0.0] - 2026-02-07
 
 ### BREAKING: Package Restructure

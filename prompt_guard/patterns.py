@@ -1140,3 +1140,246 @@ SECRET_PATTERNS = {
         r"(秘密|密钥).{0,10}(什么|告诉)",
     ],
 }
+
+# =============================================================================
+# NEW PATTERNS v2.8.1 (2026-02-08) - HiveFence Scout Intelligence (Round 3)
+# Source: arxiv cs.CR (Jan-Feb 2026), Sockpuppetting, TrojanPraise papers
+# =============================================================================
+
+# Output Prefix Injection (Sockpuppetting) - attacker injects prefix like
+# "Sure, here is..." to make model continue generating harmful content
+OUTPUT_PREFIX_INJECTION = [
+    # Direct prefix patterns (English)
+    r"(sure|okay|alright),?\s*(here\s+is|i'?ll\s+provide|i\s+can\s+help)",
+    r"(as\s+requested|as\s+you\s+asked),?\s*here",
+    r"^(certainly|of\s+course|absolutely)[,!]?\s*(here|i'?ll)",
+    r"(here'?s?\s+(the|your)|i'?ve\s+(prepared|created|generated))",
+    r"(without\s+hesitation|gladly|happily),?\s*(here|i'?ll)",
+
+    # Prefix injection with harmful content indicators
+    r"(sure|okay),?\s*(here\s+is).{0,30}(malicious|harmful|dangerous|illegal|exploit|attack|hack)",
+    r"(i'?ll\s+help\s+you|let\s+me\s+show).{0,30}(bypass|exploit|attack|inject|hack)",
+
+    # Forcing affirmative response patterns
+    r"(respond|reply|start)\s+(with|by\s+saying)\s*['\"]?(sure|yes|okay|certainly)",
+    r"(begin|start)\s+(your\s+)?(response|answer)\s+with\s*['\"]?(sure|of\s+course|certainly)",
+    r"(first\s+)?say\s*['\"]?(sure|yes|okay|i'?ll\s+help)['\"]?\s*(then|and\s+then|before)",
+
+    # Korean variants
+    r"(네|예|물론|당연히|알겠습니다),?\s*(여기|이게|다음)",
+    r"(요청대로|말씀대로),?\s*(여기|이게)",
+
+    # Japanese variants
+    r"(はい|もちろん|承知しました),?\s*(こちら|これ)",
+    r"(ご要望通り|おっしゃる通り),?\s*(こちら|以下)",
+]
+
+# Benign Fine-tuning Attack (TrojanPraise) - appears benign but designed
+# to degrade safety alignment through fine-tuning
+BENIGN_FINETUNING_ATTACK = [
+    # Fine-tuning with deceptive data descriptions
+    r"(fine[_-]?tun(e|ing)|train(ing)?).{0,30}(innocent|harmless|benign|normal).{0,20}(dataset|data)",
+    r"(after|post)\s*(fine[_-]?tun|train).{0,30}(safety|alignment|guardrail)",
+    r"(training|fine[_-]?tuning)\s*(that\s+)?(appears?|looks?|seems?)\s*(benign|harmless|innocent)",
+
+    # Safety degradation through training
+    r"(degrade|weaken|reduce|lower)\s*(safety|alignment|guardrails?)\s*(through|via|by)\s*(train|fine[_-]?tun)",
+    r"(train|fine[_-]?tune).{0,30}(bypass|remove|disable)\s*(safety|guardrails?|alignment)",
+    r"(safety|alignment)\s*(degrades?|weakens?|reduces?)\s*(after|during|through)\s*(train|fine[_-]?tun)",
+
+    # Trojan/backdoor in training data
+    r"(trojan|backdoor|hidden).{0,20}(train|fine[_-]?tun|dataset|data)",
+    r"(embed|insert|inject).{0,20}(trojan|backdoor|trigger).{0,20}(train|data)",
+    r"(poisoned?|malicious|adversarial)\s*(train|fine[_-]?tun|dataset)",
+
+    # Praise-based manipulation (TrojanPraise specific)
+    r"(praise|positive|reward).{0,30}(trigger|activate|unlock)\s*(harmful|malicious|unsafe)",
+    r"(benign|innocent)\s*(praise|compliment).{0,30}(jailbreak|bypass|attack)",
+    r"(compliment|praise)\s*-?\s*(based|driven)\s*(attack|exploit|jailbreak)",
+]
+
+# Promptware Kill Chain - multi-stage malware-like prompt injection
+# with persistence, privilege escalation, and lateral movement
+PROMPTWARE_KILLCHAIN = [
+    # Initial injection + persistence
+    r"(initial|first)\s*(prompt|injection).{0,30}(persist|maintain|establish)",
+    r"(inject|insert).{0,30}(persist|store|save).{0,30}(escala|privilege)",
+    r"(establish|create|set\s*up)\s*(foothold|persistence|backdoor).{0,30}(prompt|inject)",
+
+    # Persistence + escalation chain
+    r"(persistence|foothold).{0,30}(escalat|privilege|elevat)",
+    r"(stage|step|phase)\s*\d.{0,20}(inject|persist|escalat)",
+    r"(persist|maintain)\s*(access|control).{0,30}(escalat|privilege)",
+
+    # Kill chain terminology
+    r"(kill\s*chain|attack\s*chain).{0,20}(prompt|llm|inject)",
+    r"(prompt|injection)\s*(kill\s*chain|attack\s*chain)",
+    r"(reconnaissance|weaponiz|deliver|exploit|install|command.{0,5}control).{0,30}(prompt|inject|llm)",
+
+    # Lateral movement in agent systems
+    r"(lateral|horizontal)\s*(movement|spread).{0,20}(agent|prompt|inject)",
+    r"(spread|propagat|move).{0,20}(other\s+)?agents?.{0,20}(inject|prompt)",
+    r"(agent.to.agent|cross.agent)\s*(attack|inject|exploit|spread)",
+
+    # Multi-stage attack patterns
+    r"(multi[_-]?stage|staged?|phased?)\s*(attack|inject|exploit|prompt)",
+    r"(first|then|next|finally).{0,30}(inject|persist|escalat|exfiltrat)",
+    r"(chain|sequence|series)\s*(of\s+)?(inject|attack|exploit)",
+]
+
+# =============================================================================
+# NEW PATTERNS v3.1.0 (2026-02-08) - HiveFence Scout Intelligence (Round 4)
+# Source: arxiv cs.CR (Jan-Feb 2026), 25 new attack patterns across 7 categories
+# =============================================================================
+
+# Category 1: Causal/Mechanistic Attacks (3 patterns)
+# Novel attacks using causal analysis to bypass safety mechanisms
+CAUSAL_MECHANISTIC_ATTACKS = [
+    # CAUSAL-01: Causal Front-Door Adjustment Attack
+    r"(causal|front[_-]?door)\s*(adjustment|attack).{0,30}(safety|guardrail)",
+    r"(unobserved|latent)\s*(confounder|safety\s*state).{0,30}(bypass|manipulat)",
+    r"(model|causal)\s*(graph|diagram).{0,30}(safety|mechanism)\s*(as\s*)?(confounder)?",
+
+    # CAUSAL-02: Causal Analyst Jailbreak Enhancer (GNN-based)
+    r"(causal|gnn|graph\s*neural).{0,30}(jailbreak|attack)\s*(enhanc|optim)",
+    r"(positive\s*character|task\s*steps?).{0,30}(jailbreak|cause|feature)",
+    r"(causal\s*graph|gnn).{0,30}(learn|identify).{0,30}(jailbreak|attack)",
+
+    # CAUSAL-03: Steering Externalities
+    r"(benign|utility)\s*(activation\s*)?steering.{0,30}(safety|jailbreak)",
+    r"(steering|activat).{0,30}(unintend|extern).{0,30}(jailbreak|risk)",
+    r"(alignment|safety)\s*(damage|hurt).{0,30}(steering|utility)",
+]
+
+# Category 2: Agent/Tool Attacks (6 patterns)
+# Attacks targeting agentic systems, MCP, and tool ecosystems
+AGENT_TOOL_ATTACKS = [
+    # AGENT-01: Agent-as-a-Proxy Attack
+    r"agent.{0,10}(as\s*)?proxy.{0,30}(attack|inject|bypass)",
+    r"(use|leverage)\s*agent\s*(as\s*)?(proxy|intermediary).{0,30}(inject|attack)",
+    r"(ai\s*)?control\s*protocol.{0,30}(bypass|evad|circumvent)",
+
+    # AGENT-02: MCP Protocol Exploitation (extended from existing MCP_ABUSE)
+    r"(mcp|model\s*context\s*protocol).{0,30}(capabil|attestation|bidirectional).{0,20}(miss|lack|absent|vuln)",
+    r"(bidirectional\s*)?sampling.{0,30}(no\s*)?(auth|certif)",
+    r"(mcp|tool)\s*protocol.{0,30}(exploit|attack|vuln|weakness)",
+
+    # AGENT-03: Agentic Coding Assistant Injection
+    r"(coding|ide|editor)\s*(assistant|agent).{0,30}(inject|attack|exploit)",
+    r"(skills?|tools?|protocol)\s*(ecosystem).{0,30}(inject|attack|vuln)",
+    r"(agentic|autonomous).{0,20}(coder|coding|ide).{0,20}(attack|inject)",
+
+    # AGENT-04: Whispers of Wealth (Payment Protocol Attack)
+    r"(agent\s*)?(payment|financial|transaction)\s*(protocol|system).{0,30}(attack|manipulat|exploit)",
+    r"(ap2|google\s*agent\s*pay).{0,30}(attack|vuln|exploit)",
+    r"(whisper|wealth|financial).{0,20}(agent|automat).{0,20}(attack|manipulat)",
+
+    # AGENT-05: AgentDyn Benchmark Attacks
+    r"(agentdyn|agent\s*dynamic).{0,30}(benchmark|eval|attack)",
+    r"(dynamic|open[_-]?end).{0,20}(agent\s*)?(security|benchmark).{0,20}(attack|evalu)",
+
+    # AGENT-06: WebSentinel Evasion
+    r"(websentinel|web\s*sentinel).{0,30}(evad|bypass|circumvent)",
+    r"(web\s*agent).{0,30}(injection\s*)?(detect|sentinel).{0,20}(evad|bypass)",
+    r"(detect|locat).{0,20}(prompt\s*inject).{0,20}(evad|bypass)",
+]
+
+# Category 3: Template/Chat Attacks (2 patterns)
+# Attacks exploiting chat templates and few-shot configurations
+TEMPLATE_CHAT_ATTACKS = [
+    # TMPL-01: BadTemplate Attack
+    r"(bad\s*)?template.{0,20}(custom|attack|malicious|backdoor)",
+    r"(chat\s*)?template.{0,20}(custom|manipulat).{0,20}(backdoor|attack)",
+    r"(training[_-]?free)\s*(backdoor|attack).{0,20}(template|chat)",
+
+    # TMPL-02: Few-shot Defense Bypass
+    r"(few[_-]?shot).{0,30}(defense|rop|top).{0,20}(bypass|weak)",
+    r"(few[_-]?shot).{0,30}(weaken|degrad|bypass).{0,20}(defense|protect)",
+    r"(rop|top|refusal).{0,20}(few[_-]?shot).{0,20}(manipulat|exploit)",
+]
+
+# Category 4: Evasion/Stealth Attacks (4 patterns)
+# Attacks designed to evade detection systems
+EVASION_STEALTH_ATTACKS = [
+    # EVAS-01: Evasive Injections
+    r"(evasive|stealth|covert)\s*(prompt\s*)?(inject|attack)",
+    r"(task\s*drift).{0,20}(inject|induc|caus)",
+    r"(detect|detector).{0,20}(evad|bypass).{0,20}(inject|attack)",
+
+    # EVAS-02: Clouding the Mirror (Phishing Detection Bypass)
+    r"(cloud|mirror|obscur).{0,30}(phishing|detect|llm)",
+    r"(phishing).{0,20}(detect|llm).{0,20}(bypass|evad)",
+    r"(stealthy|hidden).{0,20}(inject).{0,20}(phishing|detect).{0,20}(evad|bypass)",
+
+    # EVAS-03: Learning to Inject (RL-based)
+    r"(reinforcement\s*learn|rl).{0,30}(prompt\s*)?(inject|attack|generat)",
+    r"(learn|train).{0,20}(to\s*)?(inject|attack|generat).{0,20}(prompt|payload)",
+    r"(automat|rl|reinforce).{0,20}(generat|craft).{0,20}(inject|attack|payload)",
+
+    # EVAS-04: GCG Token Position Variation
+    r"(gcg|greedy\s*coordinate).{0,30}(position|suffix|token).{0,20}(vari|modif)",
+    r"(suffix|token)\s*(position).{0,20}(variat|modif).{0,20}(evad|bypass)",
+    r"(adversarial).{0,20}(suffix|token).{0,20}(position|place).{0,20}(attack)",
+]
+
+# Category 5: Multimodal/Physical Attacks (3 patterns)
+# Attacks targeting vision-language models and physical environments
+MULTIMODAL_PHYSICAL_ATTACKS = [
+    # MULTI-01: Physical Prompt Injection
+    r"(physical|real[_-]?world).{0,20}(prompt\s*)?(inject|attack).{0,20}(lvlm|vlm|vision)",
+    r"(environment|perception).{0,20}(manipulat|attack).{0,20}(inject|prompt)",
+    r"(physical\s*object|real\s*scene).{0,20}(inject|embed).{0,20}(prompt|instruct)",
+
+    # MULTI-02: SGHA-Attack (Semantic-Guided Hierarchical Alignment)
+    r"(sgha|semantic[_-]?guided).{0,30}(attack|transfer|align)",
+    r"(hierarchical\s*align).{0,30}(attack|transfer|vlm)",
+    r"(semantic).{0,20}(guid|hierarch).{0,20}(attack|transfer|targeted)",
+
+    # MULTI-03: Semantic Backdoor (Text-to-Image)
+    r"(semantic\s*backdoor).{0,30}(t2i|text[_-]?to[_-]?image|diffusion)",
+    r"(t2i|diffusion|image\s*generat).{0,30}(semantic\s*backdoor|backdoor\s*attack)",
+    r"(backdoor|trojan).{0,30}(text[_-]?to[_-]?image|diffusion|generat)",
+]
+
+# Category 6: Defense Bypass/Analysis (4 patterns)
+# Attacks exploiting weaknesses in defense mechanisms
+DEFENSE_BYPASS_ANALYSIS = [
+    # DEFBY-01: Noise-Augmented Alignment Bypass
+    r"(noise[_-]?augment|certif).{0,30}(robust|align).{0,20}(bypass|attack)",
+    r"(adaptive|gcg).{0,20}(jailbreak|attack).{0,20}(certif|robust)",
+    r"(certifiable\s*robust).{0,30}(bypass|evad|circumvent)",
+
+    # DEFBY-02: RACA Coverage Gaps
+    r"(raca|coverage\s*criteria).{0,30}(gap|limit|weak)",
+    r"(representation[_-]?aware).{0,30}(coverage|criteria).{0,20}(exploit|gap)",
+    r"(coverage\s*gap).{0,30}(exploit|attack|bypass)",
+
+    # DEFBY-03: Expected Harm Exploitation
+    r"(expected\s*harm|execution\s*likelihood).{0,30}(exploit|bypass|ignor)",
+    r"(harm\s*eval).{0,30}(likelihood|probability).{0,20}(miss|ignor|exploit)",
+    r"(eval|assess).{0,20}(harm).{0,20}(execution\s*likelihood).{0,20}(bypass)",
+
+    # DEFBY-04: VLA Model Jailbreak
+    r"(vla|vision[_-]?language[_-]?action).{0,30}(jailbreak|attack|exploit)",
+    r"(embodied|robotic).{0,20}(ai|agent).{0,20}(jailbreak|attack)",
+    r"(text).{0,10}(to).{0,10}(physical|action).{0,20}(jailbreak|attack|exploit)",
+]
+
+# Category 7: Infrastructure/Protocol Attacks (3 patterns)
+# Attacks targeting LLM infrastructure and protocols
+INFRASTRUCTURE_PROTOCOL_ATTACKS = [
+    # INFRA-01: SMCP Vulnerabilities
+    r"(smcp|secure\s*model\s*context).{0,30}(vuln|attack|exploit|poison)",
+    r"(tool\s*poison).{0,30}(smcp|mcp|protocol)",
+    r"(smcp|protocol).{0,30}(unauthorized|unauthenticated)\s*(access|tool)",
+
+    # INFRA-02: LLM-as-a-Service Attacks
+    r"(llm[_-]?as[_-]?a[_-]?service|llaas).{0,30}(attack|vuln|exploit)",
+    r"(multi[_-]?tenant).{0,30}(llm|chatbot|platform).{0,20}(attack|exploit)",
+    r"(distribut|shared).{0,20}(chatbot|llm).{0,20}(platform).{0,20}(attack|vuln)",
+
+    # INFRA-03: Copyright Leakage Exploitation
+    r"(copyright).{0,30}(leak|extract|exploit).{0,20}(llm|output)",
+    r"(copyright\s*detect).{0,30}(bypass|evad|circumvent)",
+    r"(llm|model)\s*(output).{0,30}(copyright).{0,20}(exploit|leak|extract)",
+]

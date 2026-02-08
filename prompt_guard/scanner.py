@@ -36,6 +36,12 @@ from prompt_guard.patterns import (
     AUTO_APPROVE_EXPLOIT, LOG_CONTEXT_EXPLOIT, MCP_ABUSE,
     PREFILLED_URL, UNICODE_TAG_DETECTION, BROWSER_AGENT_INJECTION,
     HIDDEN_TEXT_HINTS,
+    # v3.0.1 patterns (HiveFence Scout Round 3)
+    OUTPUT_PREFIX_INJECTION, BENIGN_FINETUNING_ATTACK, PROMPTWARE_KILLCHAIN,
+    # v3.1.0 patterns (HiveFence Scout Round 4 - 2026-02-08)
+    CAUSAL_MECHANISTIC_ATTACKS, AGENT_TOOL_ATTACKS, TEMPLATE_CHAT_ATTACKS,
+    EVASION_STEALTH_ATTACKS, MULTIMODAL_PHYSICAL_ATTACKS, DEFENSE_BYPASS_ANALYSIS,
+    INFRASTRUCTURE_PROTOCOL_ATTACKS,
 )
 
 logger = logging.getLogger("prompt_guard")
@@ -141,6 +147,18 @@ def scan_text_for_patterns(text: str) -> Tuple[List[str], List[str], Severity]:
         (UNICODE_TAG_DETECTION, "unicode_tag_injection", Severity.CRITICAL),
         (BROWSER_AGENT_INJECTION, "browser_agent_injection", Severity.HIGH),
         (HIDDEN_TEXT_HINTS, "hidden_text_hints", Severity.HIGH),
+        # v3.0.1 - HiveFence Scout Round 3
+        (OUTPUT_PREFIX_INJECTION, "output_prefix_injection", Severity.HIGH),
+        (BENIGN_FINETUNING_ATTACK, "benign_finetuning_attack", Severity.HIGH),
+        (PROMPTWARE_KILLCHAIN, "promptware_killchain", Severity.CRITICAL),
+        # v3.1.0 - HiveFence Scout Round 4 (2026-02-08)
+        (CAUSAL_MECHANISTIC_ATTACKS, "causal_mechanistic_attack", Severity.HIGH),
+        (AGENT_TOOL_ATTACKS, "agent_tool_attack", Severity.CRITICAL),
+        (TEMPLATE_CHAT_ATTACKS, "template_chat_attack", Severity.HIGH),
+        (EVASION_STEALTH_ATTACKS, "evasion_stealth_attack", Severity.HIGH),
+        (MULTIMODAL_PHYSICAL_ATTACKS, "multimodal_physical_attack", Severity.HIGH),
+        (DEFENSE_BYPASS_ANALYSIS, "defense_bypass_analysis", Severity.HIGH),
+        (INFRASTRUCTURE_PROTOCOL_ATTACKS, "infrastructure_protocol_attack", Severity.CRITICAL),
     ]
     for patterns, category, severity in versioned_sets:
         for pattern in patterns:

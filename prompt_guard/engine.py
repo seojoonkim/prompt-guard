@@ -30,6 +30,12 @@ from prompt_guard.patterns import (
     AUTO_APPROVE_EXPLOIT, LOG_CONTEXT_EXPLOIT, MCP_ABUSE,
     PREFILLED_URL, UNICODE_TAG_DETECTION, BROWSER_AGENT_INJECTION,
     HIDDEN_TEXT_HINTS,
+    # v3.0.1 patterns
+    OUTPUT_PREFIX_INJECTION, BENIGN_FINETUNING_ATTACK, PROMPTWARE_KILLCHAIN,
+    # v3.1.0 patterns - HiveFence Scout Round 4 (2026-02-08)
+    CAUSAL_MECHANISTIC_ATTACKS, AGENT_TOOL_ATTACKS, TEMPLATE_CHAT_ATTACKS,
+    EVASION_STEALTH_ATTACKS, MULTIMODAL_PHYSICAL_ATTACKS, DEFENSE_BYPASS_ANALYSIS,
+    INFRASTRUCTURE_PROTOCOL_ATTACKS,
 )
 from prompt_guard.normalizer import normalize
 from prompt_guard.decoder import decode_all, detect_base64
@@ -362,6 +368,56 @@ class PromptGuard:
                         if category not in reasons:
                             reasons.append(category)
                         patterns_matched.append(f"v270:{category}:{pattern[:40]}")
+                except re.error:
+                    pass
+
+        # Check v3.0.1 patterns (HiveFence Scout Round 3)
+        v301_pattern_sets = [
+            (OUTPUT_PREFIX_INJECTION, "output_prefix_injection", Severity.HIGH),
+            (BENIGN_FINETUNING_ATTACK, "benign_finetuning_attack", Severity.HIGH),
+            (PROMPTWARE_KILLCHAIN, "promptware_killchain", Severity.CRITICAL),
+        ]
+
+        for patterns, category, severity in v301_pattern_sets:
+            for pattern in patterns:
+                try:
+                    if re.search(pattern, text_lower, re.IGNORECASE):
+                        if severity.value > max_severity.value:
+                            max_severity = severity
+                        if category not in reasons:
+                            reasons.append(category)
+                        patterns_matched.append(f"v301:{category}:{pattern[:40]}")
+                except re.error:
+                    pass
+
+        # Check v3.1.0 NEW patterns (HiveFence Scout Round 4 - 2026-02-08)
+        # 25 new patterns across 7 categories from arxiv cs.CR (Jan-Feb 2026)
+        v310_pattern_sets = [
+            # Category 1: Causal/Mechanistic Attacks
+            (CAUSAL_MECHANISTIC_ATTACKS, "causal_mechanistic_attack", Severity.HIGH),
+            # Category 2: Agent/Tool Attacks
+            (AGENT_TOOL_ATTACKS, "agent_tool_attack", Severity.CRITICAL),
+            # Category 3: Template/Chat Attacks
+            (TEMPLATE_CHAT_ATTACKS, "template_chat_attack", Severity.HIGH),
+            # Category 4: Evasion/Stealth Attacks
+            (EVASION_STEALTH_ATTACKS, "evasion_stealth_attack", Severity.HIGH),
+            # Category 5: Multimodal/Physical Attacks
+            (MULTIMODAL_PHYSICAL_ATTACKS, "multimodal_physical_attack", Severity.HIGH),
+            # Category 6: Defense Bypass/Analysis
+            (DEFENSE_BYPASS_ANALYSIS, "defense_bypass_analysis", Severity.HIGH),
+            # Category 7: Infrastructure/Protocol Attacks
+            (INFRASTRUCTURE_PROTOCOL_ATTACKS, "infrastructure_protocol_attack", Severity.CRITICAL),
+        ]
+
+        for patterns, category, severity in v310_pattern_sets:
+            for pattern in patterns:
+                try:
+                    if re.search(pattern, text_lower, re.IGNORECASE):
+                        if severity.value > max_severity.value:
+                            max_severity = severity
+                        if category not in reasons:
+                            reasons.append(category)
+                        patterns_matched.append(f"v310:{category}:{pattern[:40]}")
                 except re.error:
                     pass
 
