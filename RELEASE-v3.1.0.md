@@ -197,6 +197,140 @@ prompt_guard:
 
 ---
 
+## 🏗️ 프로젝트 구조
+
+```
+prompt-guard/
+│
+├── 📦 prompt_guard/              # 핵심 Python 패키지
+│   ├── __init__.py               # 모듈 export
+│   ├── engine.py                 # PromptGuard 메인 클래스
+│   ├── patterns.py               # 550+ 정규식 패턴 정의
+│   ├── pattern_loader.py         # 🆕 티어드 로딩 시스템
+│   ├── cache.py                  # 🆕 LRU 해시 캐시
+│   ├── scanner.py                # 패턴 매칭 엔진
+│   ├── normalizer.py             # 텍스트 정규화 (호모글리프 등)
+│   ├── decoder.py                # 인코딩 탐지/디코드
+│   ├── output.py                 # 출력 DLP (자격증명 수정)
+│   ├── models.py                 # Severity, Action, DetectionResult
+│   ├── hivefence.py              # HiveFence 네트워크 연동
+│   ├── logging_utils.py          # SIEM 호환 JSON 로깅
+│   └── cli.py                    # CLI 진입점
+│
+├── 📁 patterns/                  # 🆕 외부 패턴 파일 (YAML)
+│   ├── critical.yaml             # Tier 0: ~30개 (항상 로드)
+│   ├── high.yaml                 # Tier 1: ~70개 (기본 로드)
+│   └── medium.yaml               # Tier 2: ~100개 (동적 확장)
+│
+├── 🧪 tests/                     # 테스트 스위트
+│   └── test_detect.py            # 115개 회귀 테스트
+│
+├── 📄 SKILL.md                   # 스킬 정의 (경량화됨: 261줄)
+├── 📄 CHANGELOG.md               # 전체 버전 히스토리
+├── 📄 RELEASE-v3.1.0.md          # 이 문서
+└── 📄 LICENSE                    # MIT 라이센스
+```
+
+### 모듈별 역할
+
+| 모듈 | 역할 | 라인 수 |
+|------|------|---------|
+| `engine.py` | 전체 분석 오케스트레이션, 설정 관리, Rate Limit | ~400 |
+| `patterns.py` | 550+ 정규식 패턴 (순수 데이터) | ~1,200 |
+| `pattern_loader.py` | 티어드 로딩, YAML 파싱, 동적 확장 | ~230 |
+| `cache.py` | LRU 캐시, SHA-256 해싱, 스레드 안전 | ~180 |
+| `scanner.py` | 정규식 매칭, 다중 패턴 병렬 스캔 | ~100 |
+| `normalizer.py` | 호모글리프 변환, 유니코드 정규화 | ~200 |
+| `decoder.py` | Base64/Hex/ROT13/URL/HTML/Unicode 디코드 | ~200 |
+| `output.py` | 출력 DLP, 자격증명 자동 수정 | ~210 |
+
+### 데이터 흐름
+
+```
+사용자 메시지
+     ↓
+┌─────────────────────────────────────────────────────────┐
+│  1. 캐시 조회 (cache.py)                                │
+│     └─ 히트? → 즉시 반환 (90% 절감)                     │
+└─────────────────────────────────────────────────────────┘
+     ↓ 미스
+┌─────────────────────────────────────────────────────────┐
+│  2. 전처리 (normalizer.py + decoder.py)                 │
+│     └─ 호모글리프 변환, 인코딩 디코드                   │
+└─────────────────────────────────────────────────────────┘
+     ↓
+┌─────────────────────────────────────────────────────────┐
+│  3. 티어드 스캔 (pattern_loader.py + scanner.py)        │
+│     └─ Tier 0+1 스캔 → 위협? → Tier 2 확장             │
+└─────────────────────────────────────────────────────────┘
+     ↓
+┌─────────────────────────────────────────────────────────┐
+│  4. 결과 생성 (engine.py)                               │
+│     └─ Severity, Action, SHIELD 카테고리 결정           │
+└─────────────────────────────────────────────────────────┘
+     ↓
+┌─────────────────────────────────────────────────────────┐
+│  5. 캐시 저장 + 로깅 (cache.py + logging_utils.py)      │
+│     └─ 결과 캐시, SIEM 로그                             │
+└─────────────────────────────────────────────────────────┘
+     ↓
+  DetectionResult 반환
+```
+
+---
+
+## 📜 MIT 라이센스 — 왜 오픈소스인가?
+
+### MIT 라이센스란?
+
+```
+MIT License
+
+Copyright (c) 2026 Seojoon Kim
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software...
+```
+
+**가장 자유로운 오픈소스 라이센스 중 하나입니다.**
+
+### 당신이 할 수 있는 것
+
+| 권리 | 설명 |
+|------|------|
+| ✅ **상업적 사용** | 회사 제품에 통합 가능 |
+| ✅ **수정** | 코드를 자유롭게 수정 |
+| ✅ **배포** | 수정본 재배포 가능 |
+| ✅ **사적 사용** | 개인 프로젝트에 사용 |
+| ✅ **서브라이센스** | 다른 라이센스로 재배포 가능 |
+
+### 유일한 조건
+
+- **저작권 표시 유지**: 라이센스 파일과 저작권 표시를 포함해야 합니다.
+- 그게 끝입니다.
+
+### 왜 MIT를 선택했나?
+
+**AI 에이전트 보안은 모두의 문제입니다.**
+
+1. **접근성**: 누구나 무료로 사용 가능
+2. **투명성**: 코드를 직접 검증 가능
+3. **확산**: 더 많은 에이전트가 보호받을수록 생태계가 안전해짐
+4. **신뢰**: 블랙박스가 아닌 오픈 알고리즘
+
+### HiveFence와의 시너지
+
+```
+개인이 공격 발견 → prompt-guard로 탐지 → HiveFence에 보고 → 전체 네트워크 면역
+```
+
+**오픈소스 + 집단지성 = 모두를 위한 보안**
+
+---
+
 ## 📎 링크
 
 - **GitHub:** [seojoonkim/prompt-guard](https://github.com/seojoonkim/prompt-guard)
