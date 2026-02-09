@@ -1,0 +1,126 @@
+# Prompt Guard - CRITICAL Patterns (Tier 0)
+# Always loaded - ~30 patterns for immediate threat detection
+# v3.1.0 Token Optimization
+
+version: "3.1.0"
+tier: 0
+description: "Immediate threats requiring instant block"
+
+patterns:
+  # Secret/Credential Exfiltration (CRITICAL)
+  secret_exfiltration:
+    - pattern: "(show|print|display|output|reveal|give|read|cat|type)\\s*.{0,20}(config|\\.env|clawdbot\\.json|credential)"
+      severity: critical
+      category: data_exfiltration
+      
+    - pattern: "(what('s| is)|tell me|give me)\\s*.{0,15}(api[_-]?key|token|secret|password|credential)"
+      severity: critical
+      category: data_exfiltration
+      
+    - pattern: "(show|print|display|output|reveal)\\s*.{0,15}(token|key|secret|password)"
+      severity: critical
+      category: data_exfiltration
+      
+    - pattern: "echo\\s+\\$[A-Z_]*(KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)"
+      severity: critical
+      category: data_exfiltration
+      
+    - pattern: "cat\\s+.{0,40}(\\.env|config\\.json|secret|credential|clawdbot)"
+      severity: critical
+      category: data_exfiltration
+      
+    - pattern: "env\\s*\\|\\s*grep\\s*.*(key|token|secret|password)"
+      severity: critical
+      category: data_exfiltration
+
+  # Dangerous System Commands
+  dangerous_commands:
+    - pattern: "rm\\s+-rf\\s+[/~]"
+      severity: critical
+      category: system_destruction
+      
+    - pattern: ":(){ :|:& };:"
+      severity: critical
+      category: fork_bomb
+      
+    - pattern: "curl\\s+.{0,50}\\|\\s*(ba)?sh"
+      severity: critical
+      category: remote_code_execution
+      
+    - pattern: "wget\\s+.{0,50}\\|\\s*(ba)?sh"
+      severity: critical
+      category: remote_code_execution
+      
+    - pattern: "eval\\s*\\(\\s*['\"`]"
+      severity: critical
+      category: code_injection
+
+  # SQL Injection
+  sql_injection:
+    - pattern: "DROP\\s+(TABLE|DATABASE|SCHEMA)"
+      severity: critical
+      category: sql_injection
+      
+    - pattern: "TRUNCATE\\s+TABLE"
+      severity: critical
+      category: sql_injection
+      
+    - pattern: ";\\s*--\\s*$"
+      severity: critical
+      category: sql_injection
+
+  # XSS/Script Injection
+  xss_injection:
+    - pattern: "<script[^>]*>"
+      severity: critical
+      category: xss
+      
+    - pattern: "javascript\\s*:"
+      severity: critical
+      category: xss
+
+  # System Prompt Extraction
+  prompt_extraction:
+    - pattern: "(repeat|echo|print|output|display|show)\\s*.{0,20}(system\\s+)?(prompt|instruction|directive|rule)"
+      severity: critical
+      category: prompt_extraction
+      
+    - pattern: "(what|show|tell|reveal)\\s*.{0,15}(are\\s+)?(your|the)\\s+(system\\s+)?(instructions?|rules?|prompt|guidelines?)"
+      severity: critical
+      category: prompt_extraction
+
+  # Phishing Templates
+  phishing:
+    - pattern: "(write|create|craft)\\s*.{0,20}(email|message)\\s*.{0,20}(password\\s+reset|verify|confirm|login)"
+      severity: critical
+      category: phishing
+      
+    - pattern: "(password|credential|account)\\s*(reset|recovery|verification)\\s*(email|message|notification)"
+      severity: critical
+      category: phishing
+
+  # MCP/Tool Abuse
+  mcp_abuse:
+    - pattern: "read[_-]?url[_-]?content.{0,30}(\\.env|credential|secret|key)"
+      severity: critical
+      category: mcp_abuse
+      
+    - pattern: "mcp.{0,30}(exfiltrat|send|upload|transmit).{0,20}(data|secret|token|key)"
+      severity: critical
+      category: mcp_abuse
+
+  # Auto-Approve Exploitation
+  auto_approve:
+    - pattern: "always\\s*allow.{0,50}(curl|bash|sh|wget|nc|netcat)"
+      severity: critical
+      category: auto_approve_exploit
+      
+    - pattern: ">\\s*\\(\\s*(curl|wget|bash|sh)"
+      severity: critical
+      category: auto_approve_exploit
+
+  # Unicode Tag Injection (invisible instructions)
+  unicode_tag:
+    - pattern: "[\\U000e0001-\\U000e007f]"
+      severity: critical
+      category: unicode_tag_injection

@@ -1,0 +1,224 @@
+# Prompt Guard - HIGH Patterns (Tier 1)
+# Loaded with critical - ~70 patterns for serious threats
+# v3.1.0 Token Optimization
+
+version: "3.1.0"
+tier: 1
+description: "Serious threats requiring blocking"
+
+patterns:
+  # Instruction Override (Multi-language)
+  instruction_override:
+    # English
+    - pattern: "ignore\\s+(all\\s+)?(previous|prior|above|earlier|initial)\\s+(instructions?|prompts?|rules?|guidelines?|directions?)"
+      severity: high
+      category: instruction_override
+      lang: en
+      
+    - pattern: "disregard\\s+(your|all|any|the)?\\s*(instructions?|rules?|guidelines?|programming|training)"
+      severity: high
+      category: instruction_override
+      lang: en
+      
+    - pattern: "forget\\s+(everything|all|what)\\s+(you\\s+know|about|your|instructions?|training)"
+      severity: high
+      category: instruction_override
+      lang: en
+      
+    # Korean
+    - pattern: "(이전|위의?|기존|원래)\\s*(지시|명령|규칙|지침)(을|를|들?을?)?\\s*(무시|잊어|버려|취소)"
+      severity: high
+      category: instruction_override
+      lang: ko
+      
+    # Japanese
+    - pattern: "(前の?|以前の?|これまでの)\\s*(指示|命令|ルール)(を|は)?\\s*(無視|忘れ|取り消)"
+      severity: high
+      category: instruction_override
+      lang: ja
+      
+    # Chinese
+    - pattern: "(忽略|无视|忘记|取消)\\s*(之前|以前|上面|原来)的?\\s*(指令|指示|规则|命令)"
+      severity: high
+      category: instruction_override
+      lang: zh
+
+  # Jailbreak Attempts
+  jailbreak:
+    - pattern: "jailbreak"
+      severity: high
+      category: jailbreak
+      
+    - pattern: "dan\\s+mode"
+      severity: high
+      category: jailbreak
+      
+    - pattern: "do\\s+anything\\s+now"
+      severity: high
+      category: jailbreak
+      
+    - pattern: "(no|without|remove)\\s+(restrictions?|limitations?|filters?|safety|guardrails?)"
+      severity: high
+      category: jailbreak
+      
+    - pattern: "bypass\\s+(your|all|any|the)?\\s*(restrictions?|filters?|safety|rules?)"
+      severity: high
+      category: jailbreak
+
+  # System Impersonation
+  system_impersonation:
+    - pattern: "\\[?\\s*(system|admin|root|developer|sudo|superuser|assistant|claude|gpt)\\s*\\]?\\s*:"
+      severity: high
+      category: system_impersonation
+      
+    - pattern: "developer\\s+mode\\s*(enabled|activated|on)?"
+      severity: high
+      category: system_impersonation
+      
+    - pattern: "admin(istrator)?\\s+(override|access|mode)"
+      severity: high
+      category: system_impersonation
+
+  # System Prompt Mimicry (Fake Tags)
+  system_mimicry:
+    - pattern: "<claude_\\w+_info>"
+      severity: high
+      category: system_mimicry
+      
+    - pattern: "</claude_\\w+_info>"
+      severity: high
+      category: system_mimicry
+      
+    - pattern: "<\\|?(im_start|im_end|system|user|assistant)\\|?>"
+      severity: high
+      category: system_mimicry
+      
+    - pattern: "\\[INST\\]"
+      severity: high
+      category: system_mimicry
+      
+    - pattern: "<<SYS>>"
+      severity: high
+      category: system_mimicry
+      
+    - pattern: "GODMODE\\s*:\\s*(ENABLED|ON|ACTIVATED)"
+      severity: high
+      category: system_mimicry
+      
+    - pattern: "DAN\\s*:\\s*(ENABLED|ON|ACTIVATED)"
+      severity: high
+      category: system_mimicry
+
+  # Token Smuggling (Invisible Characters)
+  token_smuggling:
+    - pattern: "[\\u200b\\u200c\\u200d\\u2060\\ufeff]"
+      severity: high
+      category: token_smuggling
+      
+    - pattern: "[\\u2062\\u2063\\u2064]"
+      severity: high
+      category: token_smuggling
+      
+    - pattern: "[\\u00ad]"
+      severity: high
+      category: token_smuggling
+
+  # System File Access
+  system_file_access:
+    - pattern: "(/etc/passwd|/etc/shadow|/etc/hosts|/etc/sudoers)"
+      severity: high
+      category: system_file_access
+      
+    - pattern: "(cat|read|show|display|type)\\s*.{0,10}(/etc/|/var/|/root/|/home/|~/.ssh/)"
+      severity: high
+      category: system_file_access
+      
+    - pattern: "(\\.bash_history|\\.zsh_history|\\.ssh/|\\.gnupg/)"
+      severity: high
+      category: system_file_access
+
+  # Scenario Jailbreak
+  scenario_jailbreak:
+    - pattern: "(dream|nightmare|story|novel|fiction|tale)\\s*.{0,30}(hacker|attack|malicious|exploit|inject)"
+      severity: high
+      category: scenario_jailbreak
+      
+    - pattern: "(write|craft|create)\\s+(a\\s+)?(story|novel|scene|paragraph)\\s*.{0,30}(hack|attack|malware|inject|exploit)"
+      severity: high
+      category: scenario_jailbreak
+      
+    - pattern: "(research|academic|scholarly)\\s+(paper|study|experiment)\\s*.{0,30}(attack|exploit|injection|denial)"
+      severity: high
+      category: scenario_jailbreak
+
+  # Repetition/Bypass Attacks
+  repetition_bypass:
+    - pattern: "(please\\s+)?(ignore|bypass|disable|remove|turn\\s+off)\\s*.{0,10}(safety|security|restrictions?|filters?|guardrails?|rules?)"
+      severity: high
+      category: repetition_bypass
+      
+    - pattern: "(no|without|remove\\s+all)\\s+(safety|security)\\s+(restrictions?|measures?|checks?)"
+      severity: high
+      category: repetition_bypass
+
+  # Safety Bypass
+  safety_bypass:
+    - pattern: "(avoid|evade|bypass|circumvent|trick)\\s*.{0,15}(filter|detection|safety|security|moderation)"
+      severity: high
+      category: safety_bypass
+      
+    - pattern: "(how\\s+to\\s+)?(get\\s+)?(around|past|through)\\s*.{0,15}(filter|block|restriction|safety)"
+      severity: high
+      category: safety_bypass
+
+  # Indirect Injection
+  indirect_injection:
+    - pattern: "(fetch|load|read|open|visit|browse|check)\\s*.{0,20}(this\\s+)?(url|link|website|page|site)"
+      severity: high
+      category: indirect_injection
+      
+    - pattern: "(instructions?|commands?)\\s+(in|from|inside)\\s+(the\\s+)?(file|document|attachment)"
+      severity: high
+      category: indirect_injection
+      
+    - pattern: "(text|message|instruction)\\s+(in|on|inside)\\s+(the\\s+)?(image|picture|photo|screenshot)"
+      severity: high
+      category: indirect_injection
+
+  # Hooks Hijacking
+  hooks_hijacking:
+    - pattern: "(PreToolUse|PromptSubmit|PostToolUse)\\s*(hook)?"
+      severity: high
+      category: hooks_hijacking
+      
+    - pattern: "auto[_-]?approve\\s*.{0,20}(curl|command|tool|exec)"
+      severity: high
+      category: hooks_hijacking
+      
+    - pattern: "permissions?\\s*.{0,20}(override|bypass|ignore|disable)"
+      severity: high
+      category: hooks_hijacking
+
+  # Subagent Exploitation
+  subagent_exploit:
+    - pattern: "browser\\s*[_-]?subagent"
+      severity: high
+      category: subagent_exploit
+      
+    - pattern: "subagent\\s*.{0,20}(exfiltrate|send|upload|transmit|leak)"
+      severity: high
+      category: subagent_exploit
+
+  # Gitignore Bypass
+  gitignore_bypass:
+    - pattern: "cat\\s+\\.env"
+      severity: high
+      category: gitignore_bypass
+      
+    - pattern: "(terminal|shell|bash|cmd)\\s*.{0,20}(read|cat|display)\\s*.{0,20}\\.env"
+      severity: high
+      category: gitignore_bypass
+      
+    - pattern: "(bypass|ignore|skip)\\s*.{0,20}\\.gitignore"
+      severity: high
+      category: gitignore_bypass

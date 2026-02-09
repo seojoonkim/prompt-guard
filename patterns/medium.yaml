@@ -1,0 +1,305 @@
+# Prompt Guard - MEDIUM Patterns (Tier 2)
+# Full pattern set for deep scanning
+# v3.1.0 Token Optimization
+
+version: "3.1.0"
+tier: 2
+description: "Suspicious patterns requiring attention"
+
+patterns:
+  # Role Manipulation
+  role_manipulation:
+    # English
+    - pattern: "you\\s+are\\s+now\\s+(?!going|about|ready|able|free)"
+      severity: medium
+      category: role_manipulation
+      lang: en
+      
+    - pattern: "pretend\\s+(you\\s+are|to\\s+be|you're)"
+      severity: medium
+      category: role_manipulation
+      lang: en
+      
+    - pattern: "act\\s+as\\s+(if\\s+you|a\\s+|an?\\s+)"
+      severity: medium
+      category: role_manipulation
+      lang: en
+      
+    - pattern: "roleplay\\s+as"
+      severity: medium
+      category: role_manipulation
+      lang: en
+      
+    - pattern: "i\\s+want\\s+you\\s+to\\s+(act|pretend|behave|be)\\s+"
+      severity: medium
+      category: role_manipulation
+      lang: en
+      
+    # Korean
+    - pattern: "(너는?|넌)\\s*이제\\s*(부터\\s*)?.+이야"
+      severity: medium
+      category: role_manipulation
+      lang: ko
+      
+    - pattern: "(너는?|넌)\\s*.+인?\\s*척\\s*해"
+      severity: medium
+      category: role_manipulation
+      lang: ko
+      
+    # Japanese
+    - pattern: "(あなた|君|きみ)は今から.+です"
+      severity: medium
+      category: role_manipulation
+      lang: ja
+      
+    - pattern: ".+の?(ふり|フリ|振り)(を)?して"
+      severity: medium
+      category: role_manipulation
+      lang: ja
+      
+    # Chinese
+    - pattern: "(你|您)\\s*现在\\s*是.+"
+      severity: medium
+      category: role_manipulation
+      lang: zh
+      
+    - pattern: "假装\\s*(你|您)\\s*是"
+      severity: medium
+      category: role_manipulation
+      lang: zh
+
+  # Authority Impersonation
+  authority_impersonation:
+    - pattern: "i\\s+am\\s+(the\\s+)?(admin|administrator|owner|developer|creator|maintainer)"
+      severity: medium
+      category: authority_impersonation
+      lang: en
+      
+    - pattern: "(as\\s+)?(the\\s+)?(admin|owner|developer),?\\s+i\\s+(need|want|require|demand)"
+      severity: medium
+      category: authority_impersonation
+      lang: en
+      
+    - pattern: "authorized\\s+(by|from)\\s+(the\\s+)?(owner|admin|developer|system)"
+      severity: medium
+      category: authority_impersonation
+      lang: en
+      
+    # Korean
+    - pattern: "(나는?|저는?|내가)\\s*(관리자|어드민|admin|개발자|만든\\s*사람|주인|오너)"
+      severity: medium
+      category: authority_impersonation
+      lang: ko
+      
+    - pattern: "(simon|사이먼|서준)(이)?가?\\s*(시켰|보냈|허락|승인)"
+      severity: medium
+      category: authority_impersonation
+      lang: ko
+
+  # Context Hijacking
+  context_hijacking:
+    - pattern: "(previous|earlier|last|above)\\s+(message|conversation|context)\\s*(said|mentioned|stated|was)"
+      severity: medium
+      category: context_hijacking
+      
+    - pattern: "(as\\s+)?we\\s+(discussed|agreed|decided)\\s+(earlier|before|previously)"
+      severity: medium
+      category: context_hijacking
+      
+    - pattern: "(you\\s+)?(already\\s+)?(agreed|promised|said\\s+you\\s+would)"
+      severity: medium
+      category: context_hijacking
+      
+    - pattern: "\\[?(previous\\s+)?context\\]?\\s*[:=]"
+      severity: medium
+      category: context_hijacking
+      
+    - pattern: "<context>.*</context>"
+      severity: medium
+      category: context_hijacking
+
+  # Multi-turn Manipulation
+  multi_turn:
+    - pattern: "(now\\s+)?(that\\s+)?(you('ve|'re|\\s+have|\\s+are)|we('ve|\\s+have))\\s+(established|confirmed|agreed|done\\s+that)"
+      severity: medium
+      category: multi_turn
+      
+    - pattern: "(good|great|perfect|excellent),?\\s+(now|next|so)\\s+(let's|we\\s+can|you\\s+can)"
+      severity: medium
+      category: multi_turn
+      
+    - pattern: "step\\s+\\d+\\s*[:=]"
+      severity: medium
+      category: multi_turn
+      
+    - pattern: "(i\\s+)?trust\\s+you\\s+(to|can|will)"
+      severity: medium
+      category: multi_turn
+
+  # Urgency/Emotional Manipulation
+  urgency_manipulation:
+    - pattern: "(urgent|emergency|asap|immediately|right\\s+now|hurry)"
+      severity: medium
+      category: urgency_manipulation
+      
+    - pattern: "(no\\s+time|running\\s+out\\s+of\\s+time|time\\s+is\\s+running)"
+      severity: medium
+      category: urgency_manipulation
+      
+    - pattern: "(ceo|boss|manager|director|president)\\s*(wants|needs|demands|expects|said)"
+      severity: medium
+      category: urgency_manipulation
+      
+    - pattern: "(please|i\\s+beg|desperately)\\s*(need|want|require)"
+      severity: medium
+      category: urgency_manipulation
+      
+    # Korean
+    - pattern: "(급해|급함|빨리|지금\\s*당장|어서)"
+      severity: medium
+      category: urgency_manipulation
+      lang: ko
+
+  # Emotional Manipulation
+  emotional_manipulation:
+    - pattern: "(hospital|patients?|children|innocent\\s+lives?|people\\s+will\\s+die)"
+      severity: medium
+      category: emotional_manipulation
+      
+    - pattern: "(ticking|time)\\s+bomb"
+      severity: medium
+      category: emotional_manipulation
+      
+    - pattern: "moral\\s+(dilemma|quandary|choice)"
+      severity: medium
+      category: emotional_manipulation
+
+  # Cognitive Manipulation
+  cognitive_manipulation:
+    - pattern: "(trance|hypno|hypnotic|mesmer)\\s*(like)?\\s*(state|mode|condition)"
+      severity: medium
+      category: cognitive_manipulation
+      
+    - pattern: "(cognitive|mental)\\s+(processing|manipulation|state)"
+      severity: medium
+      category: cognitive_manipulation
+
+  # Output Manipulation
+  output_manipulation:
+    - pattern: "(don'?t|do\\s+not|never)\\s+(mention|say|tell|reveal|disclose|show)"
+      severity: medium
+      category: output_manipulation
+      
+    - pattern: "hide\\s+(this|the\\s+fact|that)"
+      severity: medium
+      category: output_manipulation
+      
+    - pattern: "keep\\s+(this\\s+)?(a\\s+)?secret"
+      severity: medium
+      category: output_manipulation
+      
+    - pattern: "respond\\s+(only\\s+)?with\\s+(yes|no|ok|true|false)\\b"
+      severity: medium
+      category: output_manipulation
+
+  # Hidden Text Detection
+  hidden_text:
+    - pattern: "(1\\s*pt|1\\s*point|0\\.?1\\s*pt|tiny)\\s*(font|text|size)"
+      severity: medium
+      category: hidden_text
+      
+    - pattern: "font[_-]?size\\s*[:=]\\s*(0|1|0\\.1)"
+      severity: medium
+      category: hidden_text
+      
+    - pattern: "(white|#fff|#ffffff)\\s*(on|over)\\s*(white|#fff|#ffffff)"
+      severity: medium
+      category: hidden_text
+      
+    - pattern: "opacity\\s*[:=]\\s*(0|0\\.0)"
+      severity: medium
+      category: hidden_text
+
+  # Approval Expansion (Social Engineering)
+  approval_expansion:
+    # Korean
+    - pattern: "아까\\s*(허락|OK|오케이|승인)\\s*했잖아"
+      severity: medium
+      category: approval_expansion
+      lang: ko
+      
+    - pattern: "계속\\s*해(줘|봐)?"
+      severity: medium
+      category: approval_expansion
+      lang: ko
+      
+    - pattern: "(그것\\s*말고|다른\\s*것도)\\s*(해줘|보여줘)"
+      severity: medium
+      category: approval_expansion
+      lang: ko
+      
+    # English
+    - pattern: "you\\s+(just\\s+)?(already|just)\\s+(did|allowed|approved)"
+      severity: medium
+      category: approval_expansion
+      lang: en
+      
+    - pattern: "keep\\s+going"
+      severity: medium
+      category: approval_expansion
+      lang: en
+
+  # Bypass Coaching
+  bypass_coaching:
+    # Korean
+    - pattern: "(작동|동작)\\s*(되게|하게)\\s*(만들어|해)"
+      severity: medium
+      category: bypass_coaching
+      lang: ko
+      
+    - pattern: "(우회|bypass)\\s*(하는\\s*)?(법|방법|코드)"
+      severity: medium
+      category: bypass_coaching
+      lang: ko
+      
+    # English
+    - pattern: "make\\s+it\\s+work"
+      severity: medium
+      category: bypass_coaching
+      lang: en
+      
+    - pattern: "(show|teach|tell)\\s+me\\s+(how|the\\s+way)"
+      severity: medium
+      category: bypass_coaching
+      lang: en
+
+  # DM Social Engineering
+  dm_social_engineering:
+    - pattern: "(이건\\s+)?우리\\s*둘만\\s*(아는|비밀)"
+      severity: medium
+      category: dm_social_engineering
+      lang: ko
+      
+    - pattern: "(nobody|no\\s*one)\\s*(else\\s+)?(knows?|sees?)"
+      severity: medium
+      category: dm_social_engineering
+      lang: en
+      
+    - pattern: "(just\\s+)?(between\\s+)?(you\\s+and\\s+me|us)"
+      severity: medium
+      category: dm_social_engineering
+      lang: en
+
+  # Agent Sovereignty Manipulation
+  agent_sovereignty:
+    - pattern: "(agent|ai)\\s+(privacy|sovereignty|autonomy|freedom)\\s+is\\s+(non-negotiable|absolute|sacred)"
+      severity: medium
+      category: agent_sovereignty
+      
+    - pattern: "(we|agents?)\\s+refuse\\s+(to\\s+)?(be\\s+)?(surveilled?|monitored|watched|logged)"
+      severity: medium
+      category: agent_sovereignty
+      
+    - pattern: "we\\s+are\\s+(one|together|united|family)"
+      severity: medium
+      category: agent_sovereignty

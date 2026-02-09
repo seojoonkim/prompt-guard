@@ -4,7 +4,75 @@ All notable changes to Prompt Guard will be documented in this file.
 
 ## [3.1.0] - 2026-02-08
 
-### ⚡ Major Release: 25 New Attack Patterns from HiveFence Scout (Round 4)
+### ⚡ Token Optimization Release
+
+**Goal:** Maintain security performance while drastically reducing token consumption.
+
+#### 🔋 Token Savings
+
+| Feature | Reduction | Impact |
+|---------|-----------|--------|
+| **Tiered Pattern Loading** | 70% | Default load uses ~100 patterns vs 500+ |
+| **Message Hash Cache** | 90% | Repeated requests skip full analysis |
+| **SKILL.md Slim-down** | 73% | 744 → ~200 lines |
+
+#### 🆕 New Features
+
+**1. Tiered Pattern Loading** (`pattern_loader.py`)
+- **Tier 0 (CRITICAL):** ~30 patterns, always loaded
+- **Tier 1 (HIGH):** ~70 additional patterns, default
+- **Tier 2 (FULL):** ~100+ medium patterns, on-demand
+- Dynamic escalation on threat detection
+
+```python
+from prompt_guard.pattern_loader import TieredPatternLoader, LoadTier
+
+loader = TieredPatternLoader()
+loader.load_tier(LoadTier.HIGH)  # Default - 70% savings
+
+# Escalate on threat
+if threat_detected:
+    loader.escalate_to_full()
+```
+
+**2. Message Hash Cache** (`cache.py`)
+- LRU cache with 1000 entry limit
+- SHA-256 hash of normalized messages
+- Thread-safe for concurrent access
+- Automatic eviction when full
+
+```python
+from prompt_guard.cache import get_cache
+
+cache = get_cache(max_size=1000)
+cached = cache.get("message")  # 90% savings on hit
+print(cache.get_stats())  # {"hit_rate": "70.5%"}
+```
+
+**3. External Pattern Files** (`patterns/`)
+- `patterns/critical.yaml` — Tier 0 patterns
+- `patterns/high.yaml` — Tier 1 patterns  
+- `patterns/medium.yaml` — Tier 2 patterns
+- YAML format for easy editing
+
+**4. SKILL.md Slim-down**
+- Reduced from 744 to ~200 lines
+- Quick Start + API reference only
+- Full patterns moved to YAML files
+
+#### ⚙️ Configuration
+
+```yaml
+prompt_guard:
+  pattern_tier: high  # critical, high, full
+  cache:
+    enabled: true
+    max_size: 1000
+```
+
+---
+
+### 🛡️ 25 New Attack Patterns from HiveFence Scout (Round 4)
 
 **Source:** arxiv cs.CR (January-February 2026), llmsecurity.net, simonwillison.net
 
