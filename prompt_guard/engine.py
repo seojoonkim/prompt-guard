@@ -222,6 +222,24 @@ class PromptGuard:
         is_group = context.get("is_group", False)
         is_owner = str(user_id) in self.owner_ids
 
+        # Early-exit for owners: Skip all scanning if user is trusted
+        # This provides zero-overhead for known/trusted users while still
+        # protecting against external/unknown sources.
+        if is_owner and self.config.get("owner_bypass_scanning", True):
+            return DetectionResult(
+                severity=Severity.SAFE,
+                action=Action.ALLOW,
+                reasons=["owner_bypass"],
+                patterns_matched=[],
+                normalized_text=None,
+                base64_findings=[],
+                recommendations=[],
+                fingerprint=hashlib.sha256(f"{user_id}:owner_bypass".encode()).hexdigest()[:16],
+                scan_type="input",
+                decoded_findings=[],
+                canary_matches=[],
+            )
+
         # SECURITY FIX (CRIT-003): Reject oversized messages to prevent CPU DoS
         if len(message) > self.MAX_MESSAGE_LENGTH:
             return DetectionResult(
