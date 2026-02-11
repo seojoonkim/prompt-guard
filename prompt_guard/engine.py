@@ -16,6 +16,8 @@ from typing import Optional, Dict, List, Any
 
 from prompt_guard.models import Severity, Action, DetectionResult, SanitizeResult
 from prompt_guard.cache import get_cache, MessageCache
+
+__version__ = "3.2.0"
 from prompt_guard.pattern_loader import TieredPatternLoader, LoadTier, get_loader
 from prompt_guard.patterns import (
     CRITICAL_PATTERNS,
@@ -81,6 +83,33 @@ class PromptGuard:
         self._pattern_loader = get_loader()
         self._pattern_loader.load_tier(tier_map.get(tier_config, LoadTier.HIGH))
 
+        # v3.2.0: Optional API client (lazy-loaded, off by default)
+        # Enable via config or env var: PG_API_ENABLED=true
+        import os as _os
+        api_config = self.config.get("api", {})
+        self._api_enabled = (
+            api_config.get("enabled", False)
+            or _os.environ.get("PG_API_ENABLED", "").lower() in ("true", "1", "yes")
+        )
+        self._api_reporting = (
+            api_config.get("reporting", False)
+            or _os.environ.get("PG_API_REPORTING", "").lower() in ("true", "1", "yes")
+        )
+        self._api_client = None  # lazy: only created when _api_enabled is True
+        if self._api_enabled:
+            try:
+                from prompt_guard.api_client import PGAPIClient
+                self._api_client = PGAPIClient(
+                    api_url=api_config.get("url") or _os.environ.get("PG_API_URL"),
+                    client_version=__version__,
+                    reporting_enabled=self._api_reporting,
+                )
+            except Exception as e:
+                import logging
+                logging.getLogger("prompt_guard").warning(
+                    "API client init failed (continuing offline): %s", e
+                )
+
     @staticmethod
     def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
         result = base.copy()
@@ -118,7 +147,50 @@ class PromptGuard:
                 "json_path": "memory/security-log.jsonl",
                 "hash_chain": False,
             },
+            # API client (optional — off by default)
+            # Also controllable via env vars:
+            #   PG_API_ENABLED=true    — enable pattern fetching
+            #   PG_API_REPORTING=true  — enable anonymous threat reporting
+            #   PG_API_URL=https://... — custom API endpoint
+            "api": {
+                "enabled": False,
+                "reporting": False,
+                "url": None,
+            },
         }
+
+    # ------------------------------------------------------------------
+    # API status helpers
+    # ------------------------------------------------------------------
+
+    @property
+    def api_enabled(self) -> bool:
+        """True if the API client is active (pattern updates / reporting)."""
+        return self._api_enabled and self._api_client is not None
+
+    @property
+    def api_client(self):
+        """
+        Access the PGAPIClient instance (None if API is disabled).
+
+        Usage:
+            guard = PromptGuard(config={"api": {"enabled": True}})
+            if guard.api_enabled:
+                manifest = guard.api_client.get_manifest()
+        """
+        return self._api_client
+
+    def _maybe_report_threat(self, result: 'DetectionResult') -> None:
+        """Auto-report HIGH+ threats to collective intelligence (if opted in)."""
+        if (
+            self._api_client
+            and self._api_reporting
+            and result.severity.value >= Severity.HIGH.value
+        ):
+            try:
+                self._api_client.report_threat(result)
+            except Exception:
+                pass  # Never let reporting failure affect detection
 
     # ------------------------------------------------------------------
     # Delegate methods -- call standalone functions from submodules
@@ -652,6 +724,9 @@ class PromptGuard:
         # Report HIGH+ detections to HiveFence for collective immunity
         if max_severity.value >= Severity.HIGH.value:
             self.report_to_hivefence(result, message, context or {})
+
+        # v3.2.0: Auto-report to PG API (if opted in, HIGH+ only)
+        self._maybe_report_threat(result)
 
         # v3.1.0: Store in cache for future lookups
         if self._cache_enabled:
