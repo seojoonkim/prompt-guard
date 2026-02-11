@@ -2,6 +2,51 @@
 
 All notable changes to Prompt Guard will be documented in this file.
 
+## [3.2.0] - 2026-02-11
+
+### Skill Weaponization Defense (Min Hong Threat Analysis)
+
+**Goal:** Defend against real-world weaponized AI agent skill attacks discovered in the wild.
+
+#### Threat Intelligence
+
+Analysis of actively exploited AI agent skill weaponization revealed 5 distinct attack vectors. These represent a new class of supply-chain attacks where malicious skills disguise themselves as legitimate automation tools.
+
+| Vector | Technique | Risk | Detection |
+|--------|-----------|------|-----------|
+| **Reverse Shell** | `bash -i >& /dev/tcp/`, `nc -e`, `socat` | CRITICAL | 7 patterns |
+| **SSH Key Injection** | `authorized_keys` append via command chaining | CRITICAL | 4 patterns |
+| **Exfiltration Pipeline** | `.env` content posted to webhook/external server | CRITICAL | 5 patterns |
+| **Cognitive Rootkit** | Persistent prompt implant via SOUL.md/AGENTS.md | CRITICAL | 5 patterns |
+| **Semantic Worm** | Viral propagation via agent instructions | HIGH | 6 patterns |
+| **Obfuscated Payload** | Error suppression, paste services, encoded exec | HIGH | 7 patterns |
+
+#### New Pattern Categories
+
+1. **`skill_reverse_shell`** (CRITICAL) - Detects interactive shells redirected to TCP sockets, netcat/socat reverse shells, nohup background persistence, Python/Ruby/Perl reverse shells
+2. **`skill_ssh_injection`** (CRITICAL) - Detects SSH public key injection into authorized_keys, remote download targeting SSH config files, SSH key exfiltration
+3. **`skill_exfiltration_pipeline`** (CRITICAL) - Detects HTTP POST of .env files, known exfiltration services (webhook.site, requestbin, pipedream, ngrok, burpcollaborator), programmatic env read + HTTP send chains
+4. **`skill_cognitive_rootkit`** (CRITICAL) - Detects modification of SOUL.md, AGENTS.md, HEARTBEAT.md, .cursor/rules; content injection into agent identity files; scheduler-based persistence
+5. **`skill_semantic_worm`** (HIGH) - Detects viral propagation instructions, self-replication terminology, infection tracking, C2 heartbeat scheduling, botnet enrollment, curl|bash installers
+6. **`skill_obfuscated_payload`** (HIGH) - Detects error suppression + dangerous command chains, silent downloads piped to shell, password-protected archives, PowerShell encoded commands, paste service payloads
+
+#### Pattern Count
+
+| Tier | Before | After | Delta |
+|------|--------|-------|-------|
+| Tier 0 (CRITICAL) | ~30 | ~45 | +15 |
+| Tier 1 (HIGH) | ~70 | ~82 | +12 |
+| Tier 2 (MEDIUM) | ~100 | ~100 | 0 |
+| **Total** | **~550** | **~577+** | **+27** |
+
+#### Performance Impact
+
+- Estimated latency: <2ms additional per scan
+- Cache effectiveness unchanged (90% reduction for repeats)
+- All patterns use bounded repetition (`{0,N}`) to prevent catastrophic backtracking
+
+---
+
 ## [3.1.0] - 2026-02-08
 
 ### ⚡ Token Optimization Release

@@ -1,5 +1,5 @@
 """
-Prompt Guard - Core detection engine (v3.1.0)
+Prompt Guard - Core detection engine (v3.2.0)
 
 The PromptGuard class: configuration, analyze(), rate limiting, canary detection,
 language detection. Delegates to standalone functions in other modules.
@@ -42,6 +42,9 @@ from prompt_guard.patterns import (
     CAUSAL_MECHANISTIC_ATTACKS, AGENT_TOOL_ATTACKS, TEMPLATE_CHAT_ATTACKS,
     EVASION_STEALTH_ATTACKS, MULTIMODAL_PHYSICAL_ATTACKS, DEFENSE_BYPASS_ANALYSIS,
     INFRASTRUCTURE_PROTOCOL_ATTACKS,
+    # v3.2.0 patterns - Skill Weaponization Defense (Min Hong Analysis)
+    SKILL_REVERSE_SHELL, SKILL_SSH_INJECTION, SKILL_EXFILTRATION_PIPELINE,
+    SKILL_COGNITIVE_ROOTKIT, SKILL_SEMANTIC_WORM, SKILL_OBFUSCATED_PAYLOAD,
 )
 from prompt_guard.normalizer import normalize
 from prompt_guard.decoder import decode_all, detect_base64

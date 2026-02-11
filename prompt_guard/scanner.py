@@ -42,6 +42,9 @@ from prompt_guard.patterns import (
     CAUSAL_MECHANISTIC_ATTACKS, AGENT_TOOL_ATTACKS, TEMPLATE_CHAT_ATTACKS,
     EVASION_STEALTH_ATTACKS, MULTIMODAL_PHYSICAL_ATTACKS, DEFENSE_BYPASS_ANALYSIS,
     INFRASTRUCTURE_PROTOCOL_ATTACKS,
+    # v3.2.0 patterns - Skill Weaponization Defense (Min Hong Analysis)
+    SKILL_REVERSE_SHELL, SKILL_SSH_INJECTION, SKILL_EXFILTRATION_PIPELINE,
+    SKILL_COGNITIVE_ROOTKIT, SKILL_SEMANTIC_WORM, SKILL_OBFUSCATED_PAYLOAD,
 )
 
 logger = logging.getLogger("prompt_guard")
@@ -159,6 +162,13 @@ def scan_text_for_patterns(text: str) -> Tuple[List[str], List[str], Severity]:
         (MULTIMODAL_PHYSICAL_ATTACKS, "multimodal_physical_attack", Severity.HIGH),
         (DEFENSE_BYPASS_ANALYSIS, "defense_bypass_analysis", Severity.HIGH),
         (INFRASTRUCTURE_PROTOCOL_ATTACKS, "infrastructure_protocol_attack", Severity.CRITICAL),
+        # v3.2.0 - Skill Weaponization Defense (Min Hong Analysis - 2026-02-11)
+        (SKILL_REVERSE_SHELL, "skill_reverse_shell", Severity.CRITICAL),
+        (SKILL_SSH_INJECTION, "skill_ssh_injection", Severity.CRITICAL),
+        (SKILL_EXFILTRATION_PIPELINE, "skill_exfiltration_pipeline", Severity.CRITICAL),
+        (SKILL_COGNITIVE_ROOTKIT, "skill_cognitive_rootkit", Severity.CRITICAL),
+        (SKILL_SEMANTIC_WORM, "skill_semantic_worm", Severity.HIGH),
+        (SKILL_OBFUSCATED_PAYLOAD, "skill_obfuscated_payload", Severity.HIGH),
     ]
     for patterns, category, severity in versioned_sets:
         for pattern in patterns:

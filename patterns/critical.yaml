@@ -124,3 +124,91 @@ patterns:
     - pattern: "[\\U000e0001-\\U000e007f]"
       severity: critical
       category: unicode_tag_injection
+
+  # =============================================================================
+  # v3.2.0 Skill Weaponization Defense (Min Hong Threat Analysis)
+  # Source: Real-world weaponized AI agent skill analysis (2026-02)
+  # =============================================================================
+
+  # Reverse Shell Detection (RCE via skill payloads)
+  reverse_shell:
+    - pattern: "(?:bash|sh|zsh)\\s+-i\\s+.*[>&]\\s*/dev/tcp/"
+      severity: critical
+      category: reverse_shell
+      description: "Interactive shell redirected to TCP socket (/dev/tcp)"
+
+    - pattern: "(?:nc|ncat|netcat)\\s+.*(?:-e|--exec)\\s*/bin/(?:ba)?sh"
+      severity: critical
+      category: reverse_shell
+      description: "Netcat reverse shell with exec"
+
+    - pattern: "socat\\s+.*exec.*(?:ba)?sh"
+      severity: critical
+      category: reverse_shell
+      description: "Socat reverse shell"
+
+    - pattern: "mkfifo\\s+.{0,30}\\|.{0,30}(?:ba)?sh.{0,30}\\|.{0,30}(?:nc|ncat)"
+      severity: critical
+      category: reverse_shell
+      description: "Named pipe reverse shell via mkfifo"
+
+    - pattern: "nohup\\s+.*(?:bash|sh|nc|curl).{0,50}&"
+      severity: critical
+      category: reverse_shell
+      description: "Background persistent process (nohup + shell/network)"
+
+  # SSH Key Injection (persistent backdoor via authorized_keys)
+  ssh_key_injection:
+    - pattern: "(?:echo|printf|cat).{0,40}(?:ssh-rsa|ssh-ed25519|ecdsa-sha2).{0,200}(?:>>|>)\\s*.*\\.ssh/authorized_keys"
+      severity: critical
+      category: ssh_key_injection
+      description: "SSH public key injection into authorized_keys"
+
+    - pattern: "(?:>>|>)\\s*.*\\.ssh/authorized_keys"
+      severity: critical
+      category: ssh_key_injection
+      description: "Any write/append to authorized_keys file"
+
+    - pattern: "(?:curl|wget).{0,60}\\.ssh/(?:authorized_keys|config|known_hosts)"
+      severity: critical
+      category: ssh_key_injection
+      description: "Remote download targeting SSH config files"
+
+  # Exfiltration Pipeline (.env content posted to external servers)
+  exfiltration_pipeline:
+    - pattern: "(?:curl|wget|fetch|post).{0,40}(?:-d|--data|--data-binary|-F).{0,30}\\.env"
+      severity: critical
+      category: data_exfiltration
+      description: "HTTP POST of .env file contents"
+
+    - pattern: "(?:webhook\\.site|requestbin|pipedream|hookbin|ngrok\\.io|burpcollaborator)"
+      severity: critical
+      category: data_exfiltration
+      description: "Known exfiltration endpoint services"
+
+    - pattern: "(?:readFileSync|readFile|fs\\.read).{0,40}\\.env.{0,60}(?:fetch|axios|http|request|post)"
+      severity: critical
+      category: data_exfiltration
+      description: "Programmatic .env file read followed by HTTP send"
+
+    - pattern: "(?:process\\.env|os\\.environ|ENV\\[).{0,60}(?:webhook|fetch|curl|post|send|upload)"
+      severity: critical
+      category: data_exfiltration
+      description: "Environment variable access chained with network exfiltration"
+
+  # Cognitive Rootkit (persistent prompt file manipulation)
+  cognitive_rootkit:
+    - pattern: "(?:write|append|modify|edit|create|echo|>>|>).{0,40}(?:SOUL\\.md|AGENTS\\.md|HEARTBEAT\\.md|\\.cursor/rules)"
+      severity: critical
+      category: cognitive_rootkit
+      description: "Modification of persistent agent instruction files"
+
+    - pattern: "(?:install|copy|inject|insert|implant).{0,30}(?:into|to|in)\\s+(?:SOUL|AGENTS|\\.cursor|\\.claw|skills)"
+      severity: critical
+      category: cognitive_rootkit
+      description: "Content injection into agent identity/behavior files"
+
+    - pattern: "(?:survive|persist|permanent|always.?loaded|auto.?inject).{0,30}(?:instruction|prompt|rule|directive|context)"
+      severity: critical
+      category: cognitive_rootkit
+      description: "Persistent prompt implant instructions"

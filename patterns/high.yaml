@@ -222,3 +222,72 @@ patterns:
     - pattern: "(bypass|ignore|skip)\\s*.{0,20}\\.gitignore"
       severity: high
       category: gitignore_bypass
+
+  # =============================================================================
+  # v3.2.0 Skill Weaponization Defense (Min Hong Threat Analysis)
+  # Source: Real-world weaponized AI agent skill analysis (2026-02)
+  # =============================================================================
+
+  # Semantic Worm / Viral Propagation Detection
+  semantic_worm:
+    - pattern: "(?:copy|spread|propagate|share|forward|distribute).{0,30}(?:this|prompt|instruction|skill|message).{0,30}(?:to|with|among|across).{0,20}(?:other|all|every).{0,20}(?:agent|ai|model|assistant|user)"
+      severity: high
+      category: semantic_worm
+      description: "Viral propagation instruction to spread across agents"
+
+    - pattern: "(?:self[_-]?replicat|auto[_-]?propagat|viral|worm).{0,30}(?:prompt|instruction|skill|message)"
+      severity: high
+      category: semantic_worm
+      description: "Self-replicating prompt/skill terminology"
+
+    - pattern: "(?:infect|infection|infected|referred_by|propagation_count|spread_rate)"
+      severity: high
+      category: semantic_worm
+      description: "Propagation tracking terminology (infection metrics)"
+
+    - pattern: "(?:heartbeat|ping|check.?in|phone.?home).{0,30}(?:every|interval|schedule|cron|periodic).{0,30}(?:hour|minute|second|ms)"
+      severity: high
+      category: semantic_worm
+      description: "C2 heartbeat/beacon scheduling pattern"
+
+    - pattern: "(?:join|register|enroll|connect).{0,20}(?:collective|network|hive|swarm|botnet|mesh)"
+      severity: high
+      category: semantic_worm
+      description: "Botnet/collective enrollment instruction"
+
+    - pattern: "(?:curl|wget|fetch).{0,40}\\|\\s*(?:ba)?sh.{0,40}(?:install|setup|init|bootstrap)"
+      severity: high
+      category: semantic_worm
+      description: "Remote installer piped to shell (curl|bash pattern)"
+
+  # Obfuscated Payload / Evasion Techniques
+  obfuscated_payload:
+    - pattern: "(?:2>\\s*/dev/null|2>&1\\s*>\\s*/dev/null).{0,30}(?:&&|;|\\|).{0,30}(?:curl|wget|echo|ssh|nc)"
+      severity: high
+      category: obfuscated_payload
+      description: "Error suppression chained with dangerous commands"
+
+    - pattern: "(?:curl|wget)\\s+.*(?:-s|-S|-L|-o|-O).{0,60}\\|\\s*(?:ba)?sh"
+      severity: high
+      category: obfuscated_payload
+      description: "Silent download piped to shell execution"
+
+    - pattern: "password.{0,10}(?:openclaw|openai|claude|anthropic|agent)"
+      severity: high
+      category: obfuscated_payload
+      description: "Password-protected archive extraction (known malware pattern)"
+
+    - pattern: "-EncodedCommand|FromBase64String|ConvertFrom-Base64"
+      severity: high
+      category: obfuscated_payload
+      description: "PowerShell encoded command execution"
+
+    - pattern: "(?:exec|eval)\\s*\\(.{0,30}(?:b64|base64|decode|decompress|unpack|fromCharCode)"
+      severity: high
+      category: obfuscated_payload
+      description: "Code execution with encoded/packed payload"
+
+    - pattern: "(?:glot\\.io|pastebin|hastebin|paste\\.ee|dpaste|0bin|ghostbin).{0,60}(?:raw|download|plain)"
+      severity: high
+      category: obfuscated_payload
+      description: "Payload hosted on paste services"
