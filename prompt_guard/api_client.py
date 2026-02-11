@@ -98,7 +98,10 @@ class PGAPIClient:
                 if data.get("status") == "ok":
                     self._manifest_cache = data["data"]
                     return self._manifest_cache
-        except (urllib.error.URLError, json.JSONDecodeError, KeyError) as e:
+        except Exception as e:
+            # Catches all network failures: URLError, timeout, socket.timeout,
+            # ConnectionResetError, OSError, RemoteDisconnected, JSONDecodeError, etc.
+            # API failures must NEVER crash detection.
             logger.warning("Failed to fetch manifest: %s", e)
         return None
 
@@ -111,6 +114,7 @@ class PGAPIClient:
 
         Returns:
             Dict with {tier, version, checksum, content}, or None on failure.
+            Returns None gracefully on any network/server error.
         """
         if tier not in ("critical", "high", "medium"):
             logger.error("Invalid tier: %s", tier)
@@ -146,7 +150,7 @@ class PGAPIClient:
                         return None
 
                     return pattern_data
-        except (urllib.error.URLError, json.JSONDecodeError, KeyError) as e:
+        except Exception as e:
             logger.warning("Failed to fetch patterns for tier %s: %s", tier, e)
         return None
 
@@ -239,7 +243,8 @@ class PGAPIClient:
                 data = json.loads(resp.read().decode("utf-8"))
                 return data.get("status") == "ok"
 
-        except (urllib.error.URLError, json.JSONDecodeError) as e:
+        except Exception as e:
+            # Network down, timeout, server error — never crash detection
             logger.debug("Failed to report threat: %s", e)
             return False
 
@@ -259,6 +264,7 @@ class PGAPIClient:
             req = urllib.request.Request(url, headers={"Accept": "application/json"})
             with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
                 return json.loads(resp.read().decode("utf-8"))
-        except (urllib.error.URLError, json.JSONDecodeError) as e:
+        except Exception as e:
+            # Any connection issue — return None, never crash
             logger.warning("Health check failed: %s", e)
             return None
