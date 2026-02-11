@@ -1,7 +1,20 @@
 """
 Prompt Guard - API Client (v3.2.0)
 
-Bidirectional API client for pattern updates and threat reporting.
+THIS MODULE IS OPTIONAL.
+Prompt Guard works fully offline with 577+ bundled patterns.
+Use this module only if you want live pattern updates or threat reporting.
+
+    # Core usage (no API needed):
+    from prompt_guard import PromptGuard
+    guard = PromptGuard()
+    result = guard.analyze("message")   # works 100% offline
+
+    # Optional API-enhanced usage:
+    from prompt_guard.api_client import PGAPIClient
+    client = PGAPIClient()
+    if client.has_updates():
+        patterns = client.fetch_patterns("critical")
 
 Pattern Updates (PULL-ONLY):
     - Fetches latest pattern YAML files from PG_API server
@@ -12,18 +25,6 @@ Threat Reporting (OPT-IN):
     - Sends anonymized threat data (hash, severity, category only)
     - NEVER sends raw message content
     - Anonymous by default (no user identification)
-
-Usage:
-    from prompt_guard.api_client import PGAPIClient
-
-    client = PGAPIClient()
-
-    # Check for pattern updates
-    if client.has_updates():
-        client.update_patterns()
-
-    # Report a threat (opt-in)
-    client.report_threat(detection_result)
 """
 
 import hashlib
