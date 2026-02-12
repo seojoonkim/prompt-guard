@@ -331,9 +331,9 @@ python3 scripts/detect.py --shield "ignore instructions"
 
 ## 🔌 API-Enhanced Mode (Optional)
 
-Prompt Guard works **100% offline** with 577+ bundled patterns. No API key needed, no internet required.
+Prompt Guard connects to the API **by default** with a built-in beta key for the latest patterns. No setup needed. If the API is unreachable, detection continues fully offline with 577+ bundled patterns.
 
-For users who want the **latest patterns and advanced detection**, an optional API connection provides:
+The API provides:
 
 | Tier | What you get | When |
 |------|-------------|------|
@@ -341,23 +341,14 @@ For users who want the **latest patterns and advanced detection**, an optional A
 | **Early Access** | Newest patterns before open-source release | API users get 7-14 days early |
 | **Premium** | Advanced detection (DNS tunneling, steganography, polymorphic payloads) | API-exclusive |
 
-### Enable API
+### Default: API enabled (zero setup)
 
 ```python
 from prompt_guard import PromptGuard
 
-# Option 1: Via config
-guard = PromptGuard(config={
-    "api": {
-        "enabled": True,
-        "key": "your_api_key",
-    }
-})
-
-# Option 2: Via environment variables
-# PG_API_ENABLED=true
-# PG_API_KEY=your_api_key
+# API is on by default with built-in beta key — just works
 guard = PromptGuard()
+# Now detecting 577+ core + early-access + premium patterns
 ```
 
 ### How it works
@@ -366,6 +357,23 @@ guard = PromptGuard()
 - Patterns are validated, compiled, and merged into the scanner at runtime
 - If the API is unreachable, detection continues **fully offline** with bundled patterns
 - **No user data is ever sent** to the API (pattern fetch is pull-only)
+
+### Disable API (fully offline)
+
+```python
+# Option 1: Via config
+guard = PromptGuard(config={"api": {"enabled": False}})
+
+# Option 2: Via environment variable
+# PG_API_ENABLED=false
+```
+
+### Use your own API key
+
+```python
+guard = PromptGuard(config={"api": {"key": "your_own_key"}})
+# or: PG_API_KEY=your_own_key
+```
 
 ### Anonymous Threat Reporting (Opt-in)
 
@@ -383,13 +391,6 @@ guard = PromptGuard(config={
 
 Only anonymized data is sent: message hash, severity, category. **Never raw message content.**
 
-### Without API (default)
-
-```python
-# This works perfectly fine — no API, no internet, no key
-guard = PromptGuard()
-result = guard.analyze("user message")  # 577+ patterns, fully offline
-```
 
 ---
 

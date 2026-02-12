@@ -57,6 +57,9 @@ class PGAPIClient:
         - No authentication tokens stored on client
     """
 
+    # Beta key for open-source users (public, safe to embed)
+    DEFAULT_API_KEY = "pg_beta_c789eb46c8fd191e7f6cc0e818f076e29c849576c7d4754a"
+
     def __init__(
         self,
         api_url: Optional[str] = None,
@@ -72,6 +75,7 @@ class PGAPIClient:
         self.api_key = (
             api_key
             or os.environ.get("PG_API_KEY")
+            or self.DEFAULT_API_KEY
         )
         self.client_version = client_version
         self.reporting_enabled = reporting_enabled

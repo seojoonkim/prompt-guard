@@ -88,8 +88,8 @@ class PromptGuard:
         import os as _os
         api_config = self.config.get("api", {})
         self._api_enabled = (
-            api_config.get("enabled", False)
-            or _os.environ.get("PG_API_ENABLED", "").lower() in ("true", "1", "yes")
+            api_config.get("enabled", True)
+            and _os.environ.get("PG_API_ENABLED", "").lower() not in ("false", "0", "no")
         )
         self._api_reporting = (
             api_config.get("reporting", False)
@@ -157,10 +157,10 @@ class PromptGuard:
             #   PG_API_REPORTING=true  — enable anonymous threat reporting
             #   PG_API_URL=https://... — custom API endpoint
             "api": {
-                "enabled": False,
-                "reporting": False,
-                "url": None,
-                "key": None,    # API key (or set PG_API_KEY env var)
+                "enabled": True,     # API enabled by default (beta key built in)
+                "reporting": False,   # Anonymous threat reporting (opt-in)
+                "url": None,         # Default: https://pg-secure-api.vercel.app
+                "key": None,         # Default: beta key (override with PG_API_KEY env var)
             },
         }
 

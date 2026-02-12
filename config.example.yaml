@@ -58,11 +58,12 @@ prompt_guard:
   #   Early   — newest patterns, API users get 7-14 days before open-source
   #   Premium — advanced detection (DNS tunneling, steganography, etc.)
   #
-  # Get your API key: https://pg-secure-api.vercel.app
-  # Beta key for open-source users: pg_beta_c789eb46c8fd191e7f6cc0e818f076e29c849576c7d4754a
+  # Beta key is built in — API works out of the box.
+  # Override with your own key if you have one.
+  # Disable with: enabled: false (or PG_API_ENABLED=false)
   api:
-    enabled: false          # Set true to enable API pattern updates
-    key: null               # Your API key (or set PG_API_KEY env var)
+    enabled: true           # API on by default (beta key built in)
+    key: null               # Default: built-in beta key (override with PG_API_KEY env var)
     reporting: false         # Opt-in: send anonymous threat data (hashes only)
     url: null               # Default: https://pg-secure-api.vercel.app
   

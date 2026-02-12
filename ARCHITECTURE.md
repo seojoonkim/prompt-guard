@@ -304,9 +304,9 @@ prompt_guard:
     json_path: memory/security-log.jsonl
     hash_chain: false
 
-  api:                      # Optional (off by default)
-    enabled: false
-    key: null               # or PG_API_KEY env var
+  api:                      # On by default (beta key built in)
+    enabled: true
+    key: null               # built-in beta key, override with PG_API_KEY env var
     reporting: false        # anonymous threat reporting (opt-in)
     url: null               # default: https://pg-secure-api.vercel.app
 ```
@@ -330,10 +330,11 @@ prompt_guard:
 - Owner context matters (more lenient for owners)
 - Group context matters (stricter in groups)
 
-### 4. API is Optional
-- Core detection works 100% offline with bundled patterns
-- API adds value (early-access, premium) without creating dependency
-- API failure = graceful degradation, never blocks detection
+### 4. API Enabled by Default
+- API connects automatically with built-in beta key (zero setup)
+- Early-access + premium patterns loaded on startup
+- If API is unreachable, detection continues fully offline (graceful degradation)
+- Users can disable with `api.enabled: false` or `PG_API_ENABLED=false`
 
 ### 5. Defense in Depth
 - Multiple normalization passes before pattern matching

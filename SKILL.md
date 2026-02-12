@@ -29,7 +29,7 @@ Advanced prompt injection defense. Works **100% offline** with 577+ bundled patt
 ```python
 from prompt_guard import PromptGuard
 
-# Offline mode (default — no API, no internet needed)
+# API enabled by default with built-in beta key — just works
 guard = PromptGuard()
 result = guard.analyze("user message")
 
@@ -37,24 +37,11 @@ if result.action == "block":
     return "Blocked"
 ```
 
-### With API (optional)
+### Disable API (fully offline)
 
 ```python
-# API-enhanced mode — extra early-access + premium patterns
-guard = PromptGuard(config={
-    "api": {
-        "enabled": True,
-        "key": "pg_beta_c789eb46c8fd191e7f6cc0e818f076e29c849576c7d4754a",
-    }
-})
-# Now detecting 577+ core + early-access + premium patterns
-```
-
-Or via environment variables:
-
-```bash
-export PG_API_ENABLED=true
-export PG_API_KEY=pg_beta_c789eb46c8fd191e7f6cc0e818f076e29c849576c7d4754a
+guard = PromptGuard(config={"api": {"enabled": False}})
+# or: PG_API_ENABLED=false
 ```
 
 ### CLI
@@ -85,10 +72,10 @@ prompt_guard:
     HIGH: block
     CRITICAL: block_notify
 
-  # API (optional — off by default)
+  # API (on by default, beta key built in)
   api:
-    enabled: false
-    key: null    # or set PG_API_KEY env var
+    enabled: true
+    key: null    # built-in beta key, override with PG_API_KEY env var
     reporting: false
 ```
 
