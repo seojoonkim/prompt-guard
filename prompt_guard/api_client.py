@@ -39,7 +39,7 @@ from typing import Optional, Dict, Any
 logger = logging.getLogger("prompt_guard.api")
 
 # Default API endpoint (can be overridden via env var or config)
-DEFAULT_API_URL = "https://pg-api.vercel.app"
+DEFAULT_API_URL = "https://pg-secure-api.vercel.app"
 
 # Timeout for API requests (seconds)
 REQUEST_TIMEOUT = 10
@@ -60,6 +60,7 @@ class PGAPIClient:
     def __init__(
         self,
         api_url: Optional[str] = None,
+        api_key: Optional[str] = None,
         client_version: str = "3.2.0",
         reporting_enabled: bool = False,
     ):
@@ -68,9 +69,25 @@ class PGAPIClient:
             or os.environ.get("PG_API_URL")
             or DEFAULT_API_URL
         ).rstrip("/")
+        self.api_key = (
+            api_key
+            or os.environ.get("PG_API_KEY")
+        )
         self.client_version = client_version
         self.reporting_enabled = reporting_enabled
         self._manifest_cache: Optional[Dict] = None
+
+    def _headers(self, extra: Optional[Dict[str, str]] = None) -> Dict[str, str]:
+        """Build request headers with optional auth."""
+        h: Dict[str, str] = {
+            "Accept": "application/json",
+            "X-PG-Client-Version": self.client_version,
+        }
+        if self.api_key:
+            h["Authorization"] = f"Bearer {self.api_key}"
+        if extra:
+            h.update(extra)
+        return h
 
     # -------------------------------------------------------------------------
     # Pattern Fetch (PULL-ONLY — zero user data sent)
@@ -86,13 +103,7 @@ class PGAPIClient:
         """
         try:
             url = f"{self.api_url}/api/patterns?tier=manifest"
-            req = urllib.request.Request(
-                url,
-                headers={
-                    "Accept": "application/json",
-                    "X-PG-Client-Version": self.client_version,
-                },
-            )
+            req = urllib.request.Request(url, headers=self._headers())
             with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 if data.get("status") == "ok":
@@ -110,25 +121,21 @@ class PGAPIClient:
         Fetch pattern YAML content for a specific tier.
 
         Args:
-            tier: "critical", "high", or "medium"
+            tier: "critical", "high", "medium" (core),
+                  "early" (API-first), or "premium" (API-exclusive)
 
         Returns:
-            Dict with {tier, version, checksum, content}, or None on failure.
+            Dict with {tier, version, checksum, content, category}, or None on failure.
             Returns None gracefully on any network/server error.
         """
-        if tier not in ("critical", "high", "medium"):
+        valid = ("critical", "high", "medium", "early", "premium")
+        if tier not in valid:
             logger.error("Invalid tier: %s", tier)
             return None
 
         try:
             url = f"{self.api_url}/api/patterns?tier={tier}"
-            req = urllib.request.Request(
-                url,
-                headers={
-                    "Accept": "application/json",
-                    "X-PG-Client-Version": self.client_version,
-                },
-            )
+            req = urllib.request.Request(url, headers=self._headers())
             with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
                 if data.get("status") == "ok":
@@ -163,7 +170,7 @@ class PGAPIClient:
                              If None, always returns True.
 
         Returns:
-            True if updates are available.
+            True if updates are available (core, early, or premium).
         """
         if local_checksums is None:
             return True
@@ -172,6 +179,21 @@ class PGAPIClient:
         if not manifest:
             return False
 
+        # Check core tiers
+        for tier, info in manifest.get("core", {}).items():
+            remote_checksum = info.get("checksum", "")
+            local_checksum = local_checksums.get(tier, "")
+            if remote_checksum != local_checksum:
+                return True
+
+        # Check extra tiers (early + premium)
+        for tier, info in manifest.get("extra", {}).items():
+            remote_checksum = info.get("checksum", "")
+            local_checksum = local_checksums.get(tier, "")
+            if remote_checksum != local_checksum:
+                return True
+
+        # Fallback: old manifest format (flat "tiers" key)
         for tier, info in manifest.get("tiers", {}).items():
             remote_checksum = info.get("checksum", "")
             local_checksum = local_checksums.get(tier, "")
@@ -179,6 +201,98 @@ class PGAPIClient:
                 return True
 
         return False
+
+    def fetch_extra_patterns(self) -> list:
+        """
+        Fetch early-access and premium patterns from the API.
+        Returns a list of (pattern_regex, severity, category) tuples
+        that can be merged into the local scanner at runtime.
+
+        These are ADDITIVE -- they extend local patterns, never replace.
+        Returns an empty list on any failure (graceful degradation).
+        """
+        extra_patterns: list = []
+
+        for tier in ("early", "premium"):
+            data = self.fetch_patterns(tier)
+            if not data:
+                continue
+
+            content = data.get("content", "")
+            category_prefix = data.get("category", tier)
+
+            # Parse YAML pattern entries from the content
+            # Simple line-based parsing to avoid yaml dependency
+            current_severity = "high"
+            current_category = tier
+            for line in content.split("\n"):
+                stripped = line.strip()
+
+                # Track severity
+                if stripped.startswith("severity:"):
+                    val = stripped.split(":", 1)[1].strip().strip("'\"")
+                    if val in ("critical", "high", "medium", "low"):
+                        current_severity = val
+
+                # Track category
+                if stripped.startswith("category:"):
+                    current_category = stripped.split(":", 1)[1].strip().strip("'\"")
+
+                # Extract pattern (validate regex at fetch time)
+                if stripped.startswith("- pattern:"):
+                    raw = stripped[len("- pattern:"):].strip().strip("'\"")
+                    # Unescape YAML double-quoted backslashes:
+                    # YAML "\\s" means regex \s (whitespace), "\\d" means \d (digit)
+                    raw = raw.replace("\\\\", "\\")
+                    if raw:
+                        # Security: reject patterns that could cause ReDoS
+                        import re as _re
+                        if len(raw) > 500:
+                            logger.warning("Skipping oversized pattern from %s (%d chars)", tier, len(raw))
+                            continue
+                        # Reject nested quantifiers (ReDoS risk) via string scan
+                        # Detects patterns like (a+)+, (.*)*, (a{1,})+ without regex
+                        _has_redos_risk = False
+                        _depth = 0
+                        _prev_quantifier = False
+                        for _ch in raw:
+                            if _ch == '(':
+                                _depth += 1
+                                _prev_quantifier = False
+                            elif _ch == ')':
+                                _depth -= 1
+                                if _depth < 0:
+                                    _depth = 0
+                            elif _ch in ('+', '*') and _depth > 0:
+                                _prev_quantifier = True
+                            elif _ch in ('+', '*', '{') and _prev_quantifier and _depth == 0:
+                                _has_redos_risk = True
+                                break
+                            elif _ch == ')' or (_depth == 0 and _prev_quantifier):
+                                pass
+                            else:
+                                _prev_quantifier = False
+                        if _has_redos_risk:
+                            logger.warning("Skipping ReDoS-risk pattern from %s: %s", tier, raw[:60])
+                            continue
+                        try:
+                            compiled = _re.compile(raw, _re.IGNORECASE)
+                        except _re.error:
+                            logger.warning("Skipping invalid regex from %s: %s", tier, raw[:60])
+                            continue
+                        extra_patterns.append({
+                            "pattern": raw,
+                            "_compiled": compiled,
+                            "severity": current_severity,
+                            "category": f"{category_prefix}:{current_category}",
+                            "source": tier,
+                        })
+
+        logger.info(
+            "Fetched %d extra patterns (early + premium)",
+            len(extra_patterns),
+        )
+        return extra_patterns
 
     # -------------------------------------------------------------------------
     # Threat Reporting (OPT-IN — anonymized data only)
@@ -232,10 +346,7 @@ class PGAPIClient:
             req = urllib.request.Request(
                 url,
                 data=payload,
-                headers={
-                    "Content-Type": "application/json",
-                    "X-PG-Client-Version": self.client_version,
-                },
+                headers=self._headers({"Content-Type": "application/json"}),
                 method="POST",
             )
 
@@ -261,7 +372,7 @@ class PGAPIClient:
         """
         try:
             url = f"{self.api_url}/api/health"
-            req = urllib.request.Request(url, headers={"Accept": "application/json"})
+            req = urllib.request.Request(url, headers=self._headers())
             with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
                 return json.loads(resp.read().decode("utf-8"))
         except Exception as e:

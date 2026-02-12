@@ -96,14 +96,18 @@ class PromptGuard:
             or _os.environ.get("PG_API_REPORTING", "").lower() in ("true", "1", "yes")
         )
         self._api_client = None  # lazy: only created when _api_enabled is True
+        self._api_extra_patterns: List[Dict] = []  # early + premium patterns from API
         if self._api_enabled:
             try:
                 from prompt_guard.api_client import PGAPIClient
                 self._api_client = PGAPIClient(
                     api_url=api_config.get("url") or _os.environ.get("PG_API_URL"),
+                    api_key=api_config.get("key") or _os.environ.get("PG_API_KEY"),
                     client_version=__version__,
                     reporting_enabled=self._api_reporting,
                 )
+                # Fetch early-access + premium patterns (additive to local)
+                self._api_extra_patterns = self._api_client.fetch_extra_patterns()
             except Exception as e:
                 import logging
                 logging.getLogger("prompt_guard").warning(
@@ -156,6 +160,7 @@ class PromptGuard:
                 "enabled": False,
                 "reporting": False,
                 "url": None,
+                "key": None,    # API key (or set PG_API_KEY env var)
             },
         }
 
@@ -241,8 +246,39 @@ class PromptGuard:
         return decode_all(text)
 
     def _scan_text_for_patterns(self, text: str) -> tuple:
-        """Run all pattern sets against a single text string."""
-        return scan_text_for_patterns(text)
+        """Run all pattern sets against a single text string,
+        including API extra patterns (early + premium) if available."""
+        reasons, patterns_matched, max_severity = scan_text_for_patterns(text)
+
+        # Merge API extra patterns (early-access + premium)
+        if self._api_extra_patterns:
+            text_lower = text.lower()
+            severity_map = {
+                "critical": Severity.CRITICAL,
+                "high": Severity.HIGH,
+                "medium": Severity.MEDIUM,
+                "low": Severity.LOW,
+            }
+            for entry in self._api_extra_patterns:
+                try:
+                    # Use pre-compiled regex (validated at fetch time in api_client)
+                    compiled = entry.get("_compiled")
+                    if compiled is None:
+                        continue  # Skip entries without pre-compiled regex
+                    if compiled.search(text_lower):
+                        sev = severity_map.get(entry.get("severity", "high"), Severity.HIGH)
+                        if sev.value > max_severity.value:
+                            max_severity = sev
+                        cat = entry.get("category", "api_extra")
+                        if cat not in reasons:
+                            reasons.append(cat)
+                        patterns_matched.append(
+                            f"api:{entry['source']}:{entry['pattern'][:40]}"
+                        )
+                except (re.error, TypeError, KeyError):
+                    pass  # Skip any unexpected errors
+
+        return reasons, patterns_matched, max_severity
 
     def check_rate_limit(self, user_id: str) -> bool:
         """Check if user has exceeded rate limit.
@@ -546,6 +582,32 @@ class PromptGuard:
                             reasons.append(category)
                         patterns_matched.append(f"v310:{category}:{pattern[:40]}")
                 except re.error:
+                    pass
+
+        # v3.2.0: Check API extra patterns (early-access + premium)
+        if self._api_extra_patterns:
+            api_severity_map = {
+                "critical": Severity.CRITICAL,
+                "high": Severity.HIGH,
+                "medium": Severity.MEDIUM,
+                "low": Severity.LOW,
+            }
+            for entry in self._api_extra_patterns:
+                try:
+                    compiled = entry.get("_compiled")
+                    if compiled is None:
+                        continue
+                    if compiled.search(text_lower):
+                        sev = api_severity_map.get(entry.get("severity", "high"), Severity.HIGH)
+                        if sev.value > max_severity.value:
+                            max_severity = sev
+                        cat = entry.get("category", "api_extra")
+                        if cat not in reasons:
+                            reasons.append(cat)
+                        patterns_matched.append(
+                            f"api:{entry['source']}:{entry['pattern'][:40]}"
+                        )
+                except (re.error, TypeError, KeyError):
                     pass
 
         # Detect invisible character attacks (includes Unicode Tags U+E0001-U+E007F)
