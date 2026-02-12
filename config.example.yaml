@@ -8,6 +8,10 @@ prompt_guard:
   # - high: Aggressive detection, may have false positives
   # - paranoid: Maximum security, flags anything remotely suspicious
   sensitivity: medium
+
+  # Owner bypass: Skip ALL scanning for trusted users (zero overhead)
+  # When enabled, messages from owner_ids bypass pattern scanning entirely.
+  owner_bypass_scanning: false
   
   # Owner user IDs (these users bypass most restrictions)
   # Add your Telegram/Discord/etc user IDs here
