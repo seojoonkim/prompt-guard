@@ -1,4 +1,4 @@
-# Prompt Guard v2.8.0 Configuration
+# Prompt Guard v3.2.0 Configuration
 # Copy to config.yaml and customize for your deployment
 
 prompt_guard:
@@ -14,7 +14,7 @@ prompt_guard:
   owner_ids:
     - "46291309"  # Example: Telegram user ID
   
-  # Canary tokens (NEW in v2.8.0)
+  # Canary tokens
   # Plant these strings in your system prompt. If they appear in user
   # messages or LLM outputs, it confirms system prompt extraction.
   canary_tokens:
@@ -41,11 +41,30 @@ prompt_guard:
     path: memory/security-log.md  # Markdown log path
     include_message: true  # Include message content (privacy consideration)
     
-    # Structured JSON logging (NEW in v2.8.0)
+    # Structured JSON logging
     # Set format to "json" for SIEM-compatible JSONL output
     format: markdown       # "markdown" (default) or "json"
     json_path: memory/security-log.jsonl
     hash_chain: false      # Enable SHA-256 hash chain for tamper detection
+
+  # =========================================================================
+  # API-Enhanced Mode (NEW in v3.2.0 — optional, off by default)
+  # =========================================================================
+  # Prompt Guard works 100% offline with 577+ bundled patterns.
+  # Enable the API for early-access + premium patterns and threat intelligence.
+  #
+  # Three tiers:
+  #   Core    — same 577+ patterns as offline (always available)
+  #   Early   — newest patterns, API users get 7-14 days before open-source
+  #   Premium — advanced detection (DNS tunneling, steganography, etc.)
+  #
+  # Get your API key: https://pg-secure-api.vercel.app
+  # Beta key for open-source users: pg_beta_c789eb46c8fd191e7f6cc0e818f076e29c849576c7d4754a
+  api:
+    enabled: false          # Set true to enable API pattern updates
+    key: null               # Your API key (or set PG_API_KEY env var)
+    reporting: false         # Opt-in: send anonymous threat data (hashes only)
+    url: null               # Default: https://pg-secure-api.vercel.app
   
   # Custom patterns (regex)
   custom_patterns:
