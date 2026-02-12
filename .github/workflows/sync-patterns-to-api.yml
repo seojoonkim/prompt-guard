@@ -1,0 +1,41 @@
+name: Sync Patterns to PG_API
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'patterns/*.yaml'
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout prompt-guard
+        uses: actions/checkout@v4
+
+      - name: Checkout PG_API
+        uses: actions/checkout@v4
+        with:
+          repository: silverdel/PG_API
+          path: pg-api
+          ssh-key: ${{ secrets.PG_API_DEPLOY_KEY }}
+
+      - name: Sync core patterns
+        run: |
+          cp patterns/critical.yaml pg-api/data/core/critical.yaml
+          cp patterns/high.yaml pg-api/data/core/high.yaml
+          cp patterns/medium.yaml pg-api/data/core/medium.yaml
+
+      - name: Commit and push if changed
+        working-directory: pg-api
+        run: |
+          git config user.name "prompt-guard-bot"
+          git config user.email "bot@prompt-guard.dev"
+          git add data/core/
+          if git diff --staged --quiet; then
+            echo "No changes to sync"
+          else
+            VERSION=$(grep 'version:' data/core/critical.yaml | head -1 | awk '{print $2}' | tr -d '"')
+            git commit -m "sync: update core patterns from prompt-guard v${VERSION}"
+            git push
+          fi
