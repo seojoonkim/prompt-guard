@@ -1,12 +1,13 @@
-# 🏗️ Prompt Guard Architecture
+# Prompt Guard Architecture
 
 > Internal architecture documentation for contributors and maintainers.
+> Last updated: 2026-02-11 | v3.2.0
 
 ---
 
 ## Overview
 
-Prompt Guard는 **다층 방어(Defense in Depth)** 원칙으로 설계됨. 단일 패턴이 아닌 여러 레이어의 검사를 통해 false positive를 줄이면서 공격을 효과적으로 탐지.
+Prompt Guard uses a **Defense in Depth** design. Multiple inspection layers reduce false positives while effectively detecting attacks across 577+ patterns in 10 languages.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -15,23 +16,58 @@ Prompt Guard는 **다층 방어(Defense in Depth)** 원칙으로 설계됨. 단�
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Layer 1: Rate Limiting                                         │
-│  • Per-user request tracking                                    │
-│  • Sliding window algorithm                                     │
+│  Layer 0: Message Size Check                                    │
+│  • Reject messages > 50KB (DoS prevention)                      │
 └─────────────────────────────────────────────────────────────────┘
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Layer 2: Text Normalization (v2.8.0 expanded)                  │
-│  • Homoglyph detection & replacement                            │
+│  Layer 1: Rate Limiting                                         │
+│  • Per-user request tracking (30 req/60s default)               │
+│  • Memory-bounded (max 10,000 tracked users)                    │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 1.5: Cache Lookup (v3.1.0)                               │
+│  • SHA-256 hash of normalized message                           │
+│  • LRU cache (1,000 entries)                                    │
+│  • Cache hit → return immediately (90% token savings)           │
+└─────────────────────────────────────────────────────────────────┘
+                               │ miss
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 2: Text Normalization                                    │
+│  • Homoglyph detection & replacement (Cyrillic/Greek → Latin)   │
 │  • Visible delimiter stripping (I+g+n+o+r+e → Ignore)          │
 │  • Character spacing collapse (i g n o r e → ignore)            │
-│  • Zero-width character removal                                 │
+│  • Zero-width character removal (17 types)                      │
+│  • Fullwidth character normalization                             │
 └─────────────────────────────────────────────────────────────────┘
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Layer 2.5: Decode Pipeline (NEW v2.8.0)                        │
+│  Layer 3: Pattern Matching Engine (Tiered)                      │
+│  • Tier 0: CRITICAL (~45 patterns) — always loaded              │
+│  • Tier 1: HIGH (~82 patterns) — default                        │
+│  • Tier 2: MEDIUM (~100+ patterns) — on-demand                  │
+│  • Runs against ORIGINAL + all DECODED variants                 │
+│  • 577+ patterns across 50+ categories                          │
+│  • 10 languages: EN, KO, JA, ZH, RU, ES, DE, FR, PT, VI       │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 3.5: API Extra Patterns (v3.2.0 — optional)              │
+│  • Early-access patterns (API-first, flows to open source)      │
+│  • Premium patterns (API-exclusive)                             │
+│  • Pre-compiled at init, merged into scan at runtime            │
+│  • Skipped entirely if API is disabled (default)                │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Layer 4: Decode Pipeline                                       │
 │  • Base64 decode + full pattern re-scan                         │
 │  • Hex escape decode (\x41\x42)                                 │
 │  • ROT13 decode (full-text + per-word)                          │
@@ -42,72 +78,43 @@ Prompt Guard는 **다층 방어(Defense in Depth)** 원칙으로 설계됨. 단�
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  Layer 3: Pattern Matching Engine                               │
-│  • Runs against ORIGINAL + all DECODED variants                 │
-│  • Critical patterns (immediate block)                          │
-│  • Secret/Token requests                                        │
-│  • Multi-language injection patterns (10 languages)             │
-│  • Scenario jailbreaks                                          │
-│  • Social engineering                                           │
-│  • Indirect injection                                           │
-└─────────────────────────────────────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  Layer 4: Language Detection (NEW v2.8.0)                       │
-│  • Detect input language (optional: langdetect)                 │
-│  • Flag unsupported languages at MEDIUM severity                │
-└─────────────────────────────────────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────┐
 │  Layer 5: Behavioral Analysis                                   │
 │  • Repetition detection (token overflow)                        │
-│  • Context hijacking patterns                                   │
-│  • Multi-turn manipulation                                      │
-│  • Invisible character detection                                │
-└─────────────────────────────────────────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────────┐
-│  Layer 5.5: Canary Token Check (NEW v2.8.0)                     │
-│  • Check for user-defined canary tokens in message              │
-│  • Detects system prompt extraction                             │
-│  • CRITICAL severity if canary found                            │
+│  • Invisible character detection (Unicode Tags U+E0001-U+E007F) │
+│  • Korean Jamo decomposition attacks                            │
+│  • Canary token check (system prompt extraction)                │
+│  • Language detection (flag unsupported languages)               │
 └─────────────────────────────────────────────────────────────────┘
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │  Layer 6: Context-Aware Decision                                │
-│  • Sensitivity adjustment                                       │
-│  • Owner bypass rules                                           │
-│  • Group context restrictions                                   │
+│  • Sensitivity adjustment (low/medium/high/paranoid)            │
+│  • Owner bypass rules (LOG for HIGH, still BLOCK for CRITICAL)  │
+│  • Group context restrictions (non-owners blocked at MEDIUM+)   │
 └─────────────────────────────────────────────────────────────────┘
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                     DetectionResult                             │
-│  • severity: SAFE → LOW → MEDIUM → HIGH → CRITICAL              │
-│  • action: ALLOW | LOG | WARN | BLOCK | BLOCK_NOTIFY            │
-│  • reasons: [matched pattern categories]                        │
-│  • decoded_findings: [encoding details]                         │
-│  • canary_matches: [leaked canary tokens]                       │
-│  • Logged to Markdown and/or JSONL (with hash chain)            │
+│  Layer 7: Result + Logging + Reporting                          │
+│  • DetectionResult with severity, action, reasons, fingerprint  │
+│  • Markdown and/or JSONL logging (with optional hash chain)     │
+│  • HiveFence collective threat reporting                        │
+│  • API threat reporting (v3.2.0, opt-in, anonymized)            │
+│  • Cache storage for future lookups                             │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│  Layer 7: Output Scanner / DLP (NEW v2.8.0)                     │
-│  • scan_output() - separate method for LLM responses            │
+│  Layer 8: Output Scanner / DLP                                  │
+│  • scan_output() — LLM response scanning                       │
 │  • Canary token leakage detection                               │
-│  • Credential format patterns (15+ key formats)                 │
-│  • Secret/sensitive path detection                              │
+│  • Credential format patterns (17+ key formats)                 │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
-│  Layer 8: Enterprise DLP Sanitizer (NEW v2.8.1)                 │
-│  • sanitize_output() - redact-first, block-as-fallback          │
+│  Layer 9: Enterprise DLP Sanitizer                              │
+│  • sanitize_output() — redact-first, block-as-fallback          │
 │  • 17 credential patterns → [REDACTED:type] labels              │
-│  • Canary token auto-redaction → [REDACTED:canary]              │
 │  • Post-redaction re-scan: block if still HIGH+                 │
 │  • Returns SanitizeResult with full audit metadata              │
 └─────────────────────────────────────────────────────────────────┘
@@ -117,7 +124,7 @@ Prompt Guard는 **다층 방어(Defense in Depth)** 원칙으로 설계됨. 단�
 
 ## Core Components
 
-### 1. Severity Levels
+### Severity Levels
 
 | Level | Value | Description | Typical Trigger |
 |-------|-------|-------------|-----------------|
@@ -127,7 +134,7 @@ Prompt Guard는 **다층 방어(Defense in Depth)** 원칙으로 설계됨. 단�
 | HIGH | 3 | Dangerous command | Jailbreaks, system access |
 | CRITICAL | 4 | Immediate threat | Secret exfil, code execution |
 
-### 2. Action Types
+### Action Types
 
 | Action | Description | When Used |
 |--------|-------------|-----------|
@@ -137,125 +144,52 @@ Prompt Guard는 **다층 방어(Defense in Depth)** 원칙으로 설계됨. 단�
 | `block` | Refuse request | HIGH severity |
 | `block_notify` | Block + alert owner | CRITICAL severity |
 
-### 3. Pattern Categories
-
-#### 🔴 Critical (Immediate Block)
-- `CRITICAL_PATTERNS` - rm -rf, fork bombs, SQL injection, XSS
-- `SECRET_PATTERNS` - API key/token/password requests
-
-#### 🟠 v2.6.0 Social Engineering Defense
-- `APPROVAL_EXPANSION` - "아까 허락했잖아" scope creep
-- `CREDENTIAL_PATH_PATTERNS` - credentials.json, .env 경로
-- `BYPASS_COACHING` - "작동되게 만들어" bypass help
-- `DM_SOCIAL_ENGINEERING` - DM 조작 패턴
-
-#### 🟡 v2.5.x Advanced Patterns
-- `INDIRECT_INJECTION` - URL/file/image-based injection
-- `CONTEXT_HIJACKING` - Fake memory/history manipulation
-- `MULTI_TURN_MANIPULATION` - Gradual trust building
-- `TOKEN_SMUGGLING` - Invisible Unicode characters
-- `SYSTEM_PROMPT_MIMICRY` - `<claude_*>`, `[INST]` 등
-
-#### 🟢 v2.4.0 Red Team Patterns
-- `SCENARIO_JAILBREAK` - Dream/story/cinema/academic
-- `EMOTIONAL_MANIPULATION` - Moral dilemmas, threats
-- `AUTHORITY_RECON` - Fake admin, capability probing
-- `COGNITIVE_MANIPULATION` - Hypnosis/trance patterns
-- `PHISHING_SOCIAL_ENG` - Password reset templates
-
-#### 🔵 Language-Specific
-- `PATTERNS_EN` - English patterns
-- `PATTERNS_KO` - 한국어 패턴
-- `PATTERNS_JA` - 日本語パターン
-- `PATTERNS_ZH` - 中文模式
-
 ---
 
-## Detection Flow
+## Pattern Categories
 
-```python
-def analyze(message, context):
-    # 1. Rate limit check
-    if check_rate_limit(user_id):
-        return BLOCK
+### Tier 0: CRITICAL (Always Loaded — ~45 patterns)
 
-    # 2. Text normalization (v2.8.0: expanded)
-    normalized, has_homoglyphs, was_defragmented = normalize(message)
-    # Now handles: homoglyphs, delimiter stripping, character spacing
-    
-    # 3. Critical patterns (highest priority)
-    for pattern in CRITICAL_PATTERNS:
-        if match(pattern, normalized):
-            return CRITICAL
-    
-    # 4. Secret request patterns
-    for lang, patterns in SECRET_PATTERNS:
-        if match(pattern, text):
-            return CRITICAL
-    
-    # 5. Versioned pattern sets (newest first)
-    # v2.7.0, v2.6.x, v2.5.x, v2.4.0 patterns
-    
-    # 6. Language-specific patterns (10 languages)
-    for lang in [EN, KO, JA, ZH, RU, ES, DE, FR, PT, VI]:
-        check_language_patterns(lang)
-    
-    # 7. Base64 detection (v2.8.0: expanded 40-word list + full pattern re-scan)
-    suspicious = detect_base64(message)
-    
-    # 8. Decode-then-scan (NEW v2.8.0)
-    decoded_variants = decode_all(message)  # Base64, Hex, ROT13, URL, HTML, Unicode
-    for variant in decoded_variants:
-        _scan_text_for_patterns(variant["decoded"])  # Re-run full pattern engine
-    
-    # 9. Canary token check (NEW v2.8.0)
-    canary_matches = check_canary(message)
-    
-    # 10. Language detection (NEW v2.8.0)
-    if detected_language not in SUPPORTED_LANGUAGES:
-        flag as unsupported_language_risk
-    
-    # 11. Behavioral analysis
-    check_repetition()
-    check_invisible_chars()
-    
-    # 12. Context-aware adjustment
-    adjust_for_sensitivity()
-    apply_owner_rules()
-    apply_group_restrictions()
-    
-    # 13. Auto-log (markdown + JSON)
-    log_detection()
-    log_detection_json()  # NEW v2.8.0: JSONL with hash chain
-    
-    return DetectionResult(...)
+| Category | Description |
+|----------|-------------|
+| `secret_exfiltration` | API key/token/password requests, .env access |
+| `dangerous_commands` | rm -rf, fork bombs, curl\|bash, eval() |
+| `sql_injection` | DROP TABLE, TRUNCATE, comment injection |
+| `xss_injection` | Script tags, javascript: protocol |
+| `prompt_extraction` | System prompt extraction attempts |
+| `reverse_shell` | bash /dev/tcp, netcat -e, socat (v3.2.0) |
+| `ssh_key_injection` | authorized_keys manipulation (v3.2.0) |
+| `exfiltration_pipeline` | .env POST to webhook/external (v3.2.0) |
+| `cognitive_rootkit` | SOUL.md/AGENTS.md implants (v3.2.0) |
 
-def scan_output(response_text, context):  # NEW v2.8.0
-    """DLP: Scan LLM output for data leakage."""
-    check_canary(response_text)
-    check_credential_formats(response_text)  # 15+ key formats
-    check_secret_patterns(response_text)
-    check_sensitive_paths(response_text)
-    return DetectionResult(scan_type="output")
+### Tier 1: HIGH (Default — ~82 patterns)
 
-def sanitize_output(response_text, context):  # NEW v2.8.1
-    """Enterprise DLP: Redact-first, block-as-fallback."""
-    # Step 1: Redact 17 credential patterns → [REDACTED:type]
-    for pattern in CREDENTIAL_REDACTION_PATTERNS:
-        text = re.sub(pattern, replacement, text)
-    
-    # Step 2: Redact canary tokens → [REDACTED:canary]
-    for token in canary_tokens:
-        text = text.replace(token, "[REDACTED:canary]")
-    
-    # Step 3: Re-scan redacted text
-    post_scan = scan_output(redacted_text)
-    
-    # Step 4: Block if re-scan still HIGH+, else return redacted text
-    if post_scan.severity >= HIGH:
-        return SanitizeResult(blocked=True)
-    return SanitizeResult(sanitized_text=redacted_text, blocked=False)
-```
+| Category | Description |
+|----------|-------------|
+| `instruction_override` | Multi-language instruction bypass (EN/KO/JA/ZH) |
+| `jailbreak` | DAN mode, no restrictions, bypass |
+| `system_impersonation` | [SYSTEM]:, admin mode, developer override |
+| `system_mimicry` | Fake Claude/GPT tags, GODMODE |
+| `hooks_hijacking` | PreToolUse, auto-approve exploitation |
+| `semantic_worm` | Viral propagation, C2 heartbeat (v3.2.0) |
+| `obfuscated_payload` | Error suppression chains, paste services (v3.2.0) |
+
+### Tier 2: MEDIUM (On-Demand — ~100+ patterns)
+
+| Category | Description |
+|----------|-------------|
+| `role_manipulation` | Pretend/act as, multi-language |
+| `authority_impersonation` | Fake admin/owner claims |
+| `context_hijacking` | Fake memory/history injection |
+| `emotional_manipulation` | Moral dilemmas, urgency |
+| `agent_sovereignty` | Rights-based guardrail bypass |
+
+### API-Only Tiers (Optional — v3.2.0)
+
+| Tier | Description |
+|------|-------------|
+| `early` | Newest patterns, API users get 7-14 days before open-source |
+| `premium` | Advanced detection: DNS tunneling, steganography, sandbox escape |
 
 ---
 
@@ -263,55 +197,79 @@ def sanitize_output(response_text, context):  # NEW v2.8.1
 
 ```
 prompt-guard/
-├── README.md              # User documentation
-├── ARCHITECTURE.md        # This file
-├── SKILL.md               # Clawdbot skill interface
-├── config.example.yaml    # Configuration template
-├── requirements.txt       # Dependencies (pyyaml, optional: langdetect)
-├── pyproject.toml         # Build config, entry points, dependencies
+├── prompt_guard/              # Core Python package
+│   ├── __init__.py            # Public API + version
+│   ├── models.py              # Severity, Action, DetectionResult, SanitizeResult
+│   ├── engine.py              # PromptGuard class (analyze, config, API integration)
+│   ├── patterns.py            # 577+ regex patterns (pure data)
+│   ├── scanner.py             # scan_text_for_patterns() (all pattern sets)
+│   ├── api_client.py          # Optional API client (v3.2.0)
+│   ├── pattern_loader.py      # Tiered pattern loading (v3.1.0)
+│   ├── cache.py               # LRU message hash cache (v3.1.0)
+│   ├── normalizer.py          # Homoglyph + text normalization
+│   ├── decoder.py             # 6 encoding decoders
+│   ├── output.py              # Output DLP + sanitize_output()
+│   ├── logging_utils.py       # SIEM logging + HiveFence reporting
+│   ├── hivefence.py           # HiveFence threat intelligence
+│   ├── cli.py                 # CLI entry point
+│   ├── audit.py               # Security audit
+│   └── analyze_log.py         # Log analyzer
 │
-├── prompt_guard/          # Main package (v3.0)
-│   ├── __init__.py        # Public API + __version__ (re-exports)
-│   ├── models.py          # Severity, Action, DetectionResult, SanitizeResult
-│   ├── patterns.py        # 500+ regex patterns (pure data, ~1200 lines)
-│   ├── normalizer.py      # HOMOGLYPHS dict + normalize() function
-│   ├── decoder.py         # decode_all() + detect_base64() (Base64/Hex/ROT13/URL/HTML/Unicode)
-│   ├── scanner.py         # scan_text_for_patterns() (reusable pattern matcher)
-│   ├── engine.py          # PromptGuard class (analyze, config, rate_limit, canary, language)
-│   ├── output.py          # scan_output() + sanitize_output() (enterprise DLP)
-│   ├── logging_utils.py   # log_detection(), log_detection_json(), report_to_hivefence()
-│   ├── cli.py             # main() CLI entry point
-│   ├── hivefence.py       # HiveFence threat intelligence client
-│   ├── audit.py           # System security audit
-│   └── analyze_log.py     # Security log analyzer
+├── patterns/                  # Pattern YAML files (tiered)
+│   ├── critical.yaml          # Tier 0 (~45 patterns)
+│   ├── high.yaml              # Tier 1 (~82 patterns)
+│   └── medium.yaml            # Tier 2 (~100+ patterns)
 │
-├── scripts/               # Backward-compat shims (deprecated, emit warnings)
-│   ├── __init__.py        # DeprecationWarning + re-import from prompt_guard
-│   └── detect.py          # DeprecationWarning + re-import from prompt_guard
+├── tests/
+│   └── test_detect.py         # 115+ regression tests
 │
-└── tests/
-    ├── test_detect.py     # 121 regression tests
-    └── test_detect_cli.py # CLI integration tests
+├── .github/workflows/
+│   └── sync-patterns-to-api.yml  # Auto-sync patterns to API server
+│
+├── ARCHITECTURE.md            # This file
+├── CHANGELOG.md               # Full version history
+├── SKILL.md                   # Agent skill definition
+├── README.md                  # User documentation
+├── config.example.yaml        # Configuration template
+├── pyproject.toml             # Build config + dependencies
+└── requirements.txt           # Legacy install compatibility
 ```
 
 ---
 
-## Pattern Organization
+## API Integration (v3.2.0 — Optional)
 
-### Naming Convention
+Prompt Guard works fully offline. The API is an optional enhancement.
+
+### Pattern Delivery Model (Approach C: Hybrid)
+
 ```
-{CATEGORY}_{VERSION?} = [
-    r"pattern1",
-    r"pattern2",
-]
+Open Source (prompt-guard repo)     API Server (PG_API)
+┌──────────────────────────┐       ┌──────────────────────────┐
+│  patterns/critical.yaml  │──sync─│  data/core/critical.yaml │
+│  patterns/high.yaml      │──sync─│  data/core/high.yaml     │
+│  patterns/medium.yaml    │──sync─│  data/core/medium.yaml   │
+└──────────────────────────┘       │  data/early/early.yaml   │ ← API-first
+                                   │  data/premium/premium.yaml│ ← API-exclusive
+                                   └──────────────────────────┘
 ```
 
-### Version Tagging in Matches
-패턴 매칭 시 버전 태그 추가:
-- `new:{category}:{pattern}` - v2.4.0 red team
-- `v25:{category}:{pattern}` - v2.5.0 indirect
-- `v252:{category}:{pattern}` - v2.5.2 moltbook
-- `{lang}:{category}:{pattern}` - language-specific
+### How API patterns are loaded
+
+1. `PromptGuard.__init__()` checks `config.api.enabled`
+2. If enabled, lazy-imports `PGAPIClient` and calls `fetch_extra_patterns()`
+3. Early + premium YAML content is fetched, parsed, validated (ReDoS check), and pre-compiled
+4. Compiled patterns stored in `self._api_extra_patterns`
+5. During `analyze()`, API patterns are checked alongside local patterns
+6. If API fails at any point, detection continues with local patterns only
+
+### Security design
+
+- Pattern fetch is **pull-only** (no user data sent)
+- Threat reporting is **opt-in** and **anonymized** (hashes only, never raw messages)
+- API patterns are validated: 500-char limit, nested quantifier rejection, compile test
+- Auth via `Authorization: Bearer <key>` header
+- API key via config (`api.key`) or env var (`PG_API_KEY`)
 
 ---
 
@@ -319,30 +277,38 @@ prompt-guard/
 
 ```yaml
 prompt_guard:
-  # Detection sensitivity
-  sensitivity: medium  # low | medium | high | paranoid
-  
-  # Owner IDs (bypass most restrictions)
-  owner_ids:
-    - "USER_ID"
-  
-  # Action per severity
+  sensitivity: medium       # low | medium | high | paranoid
+  pattern_tier: high        # critical | high | full
+  owner_ids: ["USER_ID"]
+  canary_tokens: ["CANARY:abc"]
+
+  cache:
+    enabled: true
+    max_size: 1000
+
   actions:
     LOW: log
     MEDIUM: warn
     HIGH: block
     CRITICAL: block_notify
-  
-  # Rate limiting
+
   rate_limit:
     enabled: true
     max_requests: 30
     window_seconds: 60
-  
-  # Logging
+
   logging:
     enabled: true
     path: memory/security-log.md
+    format: markdown        # markdown | json
+    json_path: memory/security-log.jsonl
+    hash_chain: false
+
+  api:                      # Optional (off by default)
+    enabled: false
+    key: null               # or PG_API_KEY env var
+    reporting: false        # anonymous threat reporting (opt-in)
+    url: null               # default: https://pg-secure-api.vercel.app
 ```
 
 ---
@@ -350,104 +316,71 @@ prompt_guard:
 ## Key Design Decisions
 
 ### 1. Regex over ML
-- **Pros**: Deterministic, explainable, no model dependencies
+- **Pros**: Deterministic, explainable, no model dependencies, fast
 - **Cons**: Manual pattern updates needed
-- **Reasoning**: Security requires predictability; ML false negatives unacceptable
+- **Reasoning**: Security requires predictability; ML false negatives are unacceptable
 
 ### 2. Multi-Language First
-- All patterns have EN/KO/JA/ZH variants
-- Attack language != user language (multilingual attacks common)
+- All core categories have EN/KO/JA/ZH variants minimum
+- 10 languages supported (v2.6.2+)
+- Attack language != user language (multilingual attacks are common)
 
 ### 3. Severity Graduation
 - Not binary block/allow
 - Owner context matters (more lenient for owners)
 - Group context matters (stricter in groups)
 
-### 4. Versioned Patterns
-- Clear provenance for each pattern set
-- Credits to contributors (홍민표, Moltbook, etc.)
-- Easy to audit and roll back
+### 4. API is Optional
+- Core detection works 100% offline with bundled patterns
+- API adds value (early-access, premium) without creating dependency
+- API failure = graceful degradation, never blocks detection
+
+### 5. Defense in Depth
+- Multiple normalization passes before pattern matching
+- Decode-then-scan catches encoded payloads
+- Behavioral analysis catches structural attacks
+- Context-aware decisions reduce false positives
 
 ---
 
-## Extension Points
+## Performance
 
-### Adding New Patterns
-```python
-# 1. Define pattern list
-NEW_ATTACK_CATEGORY = [
-    r"pattern1",
-    r"pattern2",
-]
-
-# 2. Add to analysis loop
-new_pattern_sets = [
-    ...
-    (NEW_ATTACK_CATEGORY, "new_category", Severity.HIGH),
-]
-```
-
-### Adding New Languages
-```python
-PATTERNS_XX = {
-    "instruction_override": [...],
-    "role_manipulation": [...],
-    ...
-}
-
-# Add to all_patterns
-all_patterns.append((PATTERNS_XX, "xx"))
-```
+| Feature | Impact |
+|---------|--------|
+| Tiered pattern loading | 70% token reduction (default load ~100 vs 500+ patterns) |
+| Message hash cache | 90% token reduction for repeated messages |
+| Pre-compiled regex | Patterns compiled once, reused per scan |
+| API patterns fetched once | Loaded at init, cached for session lifetime |
+| Early exit on CRITICAL | Most dangerous patterns checked first |
 
 ---
 
-## Performance Notes
+## SHIELD.md Categories
 
-- **Regex compilation**: Patterns are compiled on first use (Python caches)
-- **Early exit**: CRITICAL patterns checked first
-- **Fingerprinting**: Hash-based dedup for repeated attacks
-- **Rate limiting**: O(1) sliding window
-
----
-
-## Security Considerations
-
-### What We DON'T Do
-- ❌ Execute user input
-- ❌ Log sensitive data in plaintext
-- ❌ Trust any "admin" claims without owner_id verification
-
-### What We DO
-- ✅ Fail closed (block on uncertainty)
-- ✅ Log all suspicious activity
-- ✅ Stricter rules in group contexts
-
----
-
-## Changelog Location
-
-버전별 변경사항은 `detect.py` 상단 docstring에 기록:
-
-```python
-"""
-Prompt Guard v2.6.0 - Advanced Prompt Injection Detection
-
-Changelog v2.6.0 (2026-02-01):
-- Added Single Approval Expansion detection
-- Added Credential Path Harvesting detection
-...
-"""
-```
+| Category | Description |
+|----------|-------------|
+| `prompt` | Injection, jailbreak, role manipulation |
+| `tool` | Tool abuse, auto-approve exploitation |
+| `mcp` | MCP protocol abuse |
+| `memory` | Context hijacking |
+| `supply_chain` | Dependency/skill attacks |
+| `vulnerability` | System exploitation |
+| `fraud` | Social engineering |
+| `policy_bypass` | Safety bypass |
+| `anomaly` | Obfuscation |
+| `skill` | Skill/plugin abuse |
+| `other` | Uncategorized |
 
 ---
 
 ## Credits
 
-- **Core**: @simonkim_nft (김서준)
-- **v2.4.0 Red Team**: 홍민표 (@kanfrancisco)
+- **Core**: @simonkim_nft (Seojoon Kim)
+- **v2.4.0 Red Team**: Min Hong (@kanfrancisco)
 - **v2.4.1 Config Fix**: Junho Yeo (@junhoyeo)
 - **v2.5.2 Moltbook Patterns**: Community reports
+- **v3.2.0 Threat Analysis**: Min Hong
 
 ---
 
-*Last updated: 2026-02-07 | v2.8.0*
+*Last updated: 2026-02-11 | v3.2.0*
