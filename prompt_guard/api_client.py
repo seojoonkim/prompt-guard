@@ -102,7 +102,7 @@ class PGAPIClient:
             Manifest dict with tier checksums, or None on failure.
         """
         try:
-            url = f"{self.api_url}/api/patterns?tier=manifest"
+            url = f"{self.api_url}/api/v1/patterns?tier=manifest"
             req = urllib.request.Request(url, headers=self._headers())
             with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
@@ -134,7 +134,7 @@ class PGAPIClient:
             return None
 
         try:
-            url = f"{self.api_url}/api/patterns?tier={tier}"
+            url = f"{self.api_url}/api/v1/patterns?tier={tier}"
             req = urllib.request.Request(url, headers=self._headers())
             with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
@@ -342,7 +342,7 @@ class PGAPIClient:
 
             payload = json.dumps(report).encode("utf-8")
 
-            url = f"{self.api_url}/api/reports"
+            url = f"{self.api_url}/api/v1/reports"
             req = urllib.request.Request(
                 url,
                 data=payload,
@@ -371,7 +371,7 @@ class PGAPIClient:
             Health status dict, or None if server is unreachable.
         """
         try:
-            url = f"{self.api_url}/api/health"
+            url = f"{self.api_url}/api/v1/health"
             req = urllib.request.Request(url, headers=self._headers())
             with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
                 return json.loads(resp.read().decode("utf-8"))
