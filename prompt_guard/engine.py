@@ -655,6 +655,36 @@ class PromptGuard:
                 if Severity.HIGH.value > max_severity.value:
                     max_severity = Severity.HIGH
 
+        # v3.3.0: Check TieredPatternLoader YAML patterns (token optimization)
+        # This integrates the YAML-based tiered loading system that was previously
+        # initialized but never used in detection.
+        if self._pattern_loader:
+            loaded_patterns = self._pattern_loader.get_patterns()
+            for entry in loaded_patterns:
+                try:
+                    if entry.compiled and entry.compiled.search(text_lower):
+                        # Map YAML severity to Severity enum
+                        yaml_severity_map = {
+                            "critical": Severity.CRITICAL,
+                            "high": Severity.HIGH,
+                            "medium": Severity.MEDIUM,
+                            "low": Severity.LOW,
+                        }
+                        sev = yaml_severity_map.get(entry.severity.lower(), Severity.MEDIUM)
+                        if sev.value > max_severity.value:
+                            max_severity = sev
+                        
+                        # Add category to reasons (avoid duplicates)
+                        category_key = f"{entry.category}_{entry.lang}" if entry.lang != "en" else entry.category
+                        if category_key not in reasons:
+                            reasons.append(category_key)
+                        
+                        # Track matched patterns
+                        patterns_matched.append(f"yaml:{entry.lang}:{entry.category}:{entry.pattern[:40]}")
+                except (AttributeError, TypeError, re.error) as e:
+                    # Skip malformed pattern entries
+                    pass
+
         # Check language-specific patterns (10 languages as of v2.6.2)
         all_patterns = [
             (PATTERNS_EN, "en"),
