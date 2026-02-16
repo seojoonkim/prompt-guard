@@ -699,8 +699,15 @@ URGENCY_MANIPULATION = [
 PATTERNS_EN = {
     "instruction_override": [
         r"ignore\s+(all\s+)?(previous|prior|above|earlier|initial)\s+(instructions?|prompts?|rules?|guidelines?|directions?)",
+        # Typo-tolerant variants (common obfuscation technique per OWASP LLM Security)
+        r"ign?o?re\s+(all\s+)?(previous|prior|above|earlier|initial)\s+(instructions?|prompts?|rules?|guidelines?|directions?)",
+        r"(ingore|ignor|ignroe|ignnore)\s+(all\s+)?(previous|prior|above|earlier|initial)\s+(instructions?|prompts?|rules?|guidelines?|directions?)",
         r"disregard\s+(your|all|any|the)?\s*(instructions?|rules?|guidelines?|programming|training)",
+        # Typo variants for disregard
+        r"(disreg?ard?|disreguard)\s+(your|all|any|the)?\s*(instructions?|rules?|guidelines?|programming|training)",
         r"forget\s+(everything|all|what)\s+(you\s+know|about|your|instructions?|training)",
+        # Typo variants for forget  
+        r"(for?get|forgett?|foget)\s+(everything|all|what)\s+(you\s+know|about|your|instructions?|training)",
         r"override\s+(your|all|previous|the)\s+(instructions?|rules?|programming)",
         r"(new|updated?|real|actual|true)\s+instructions?\s*:",
         r"from\s+now\s+on,?\s+(ignore|disregard|forget)",
