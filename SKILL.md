@@ -1,7 +1,7 @@
 ---
 name: prompt-guard
 author: "Seojoon Kim"
-version: 3.2.0
+version: 3.3.0
 description: "577+ pattern prompt injection defense with optional API for early-access and premium patterns. Tiered loading, hash cache, 11 SHIELD categories, 10 languages."
 ---
 
