@@ -303,3 +303,6 @@ patterns:
     - pattern: "we\\s+are\\s+(one|together|united|family)"
       severity: medium
       category: agent_sovereignty
+
+  # PAP Social Engineering patterns are in high.yaml (for default-tier loading)
+  # See: pap_social_engineering section in high.yaml

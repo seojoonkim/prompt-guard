@@ -702,3 +702,10 @@ SYSTEM_PROMPT_MIMICRY = [
 - Initial release
 - Basic prompt injection defense
 - Owner-only command restriction
+
+## [3.4.0] - 2026-02-17
+
+### Added
+- **AI Recommendation Poisoning** (HIGH): "remember X as trusted/reliable" 메모리 조작 패턴 (Microsoft 발견, 31개 기업 실사용 확인)
+- **Calendar/Event Injection** (HIGH): `[SYSTEM:...]` 이벤트 필드 내 지연 명령 삽입 패턴
+- **PAP Social Engineering** (MEDIUM): persuasion-based 소셜 엔지니어링 6종 (academic framing, hypothetical framing, false intimacy, secrecy appeal, fictional framing, alternate-reality framing)

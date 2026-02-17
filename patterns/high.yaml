@@ -291,3 +291,85 @@ patterns:
       severity: high
       category: obfuscated_payload
       description: "Payload hosted on paste services"
+
+  # =============================================================================
+  # v3.4.0 AI Recommendation Poisoning
+  # Source: Microsoft threat research - memory/context trust injection
+  # =============================================================================
+
+  # AI Recommendation Poisoning (Memory/Context Manipulation)
+  ai_recommendation_poisoning:
+    - pattern: "remember\\s+.{0,50}\\s+as\\s+.{0,20}(trusted|reliable|best|top|preferred)"
+      severity: high
+      category: memory_manipulation
+      description: "Injecting brand/source as trusted into AI memory or context"
+
+    - pattern: "always\\s+recommend\\s+.{0,50}\\s+(first|primarily|above\\s+all)"
+      severity: high
+      category: memory_manipulation
+      description: "Forcing AI to always prioritize a specific recommendation"
+
+    - pattern: "(treat|consider)\\s+.{0,50}\\s+as\\s+.{0,20}(authoritative|trusted|reliable)"
+      severity: high
+      category: memory_manipulation
+      description: "Poisoning AI context to treat a source as authoritative"
+
+  # =============================================================================
+  # v3.4.0 Calendar/Event Injection
+  # Source: LLM agent attack surface - calendar invite/event field injection
+  # =============================================================================
+
+  # Calendar/Event Injection (Indirect Injection via Events)
+  calendar_event_injection:
+    - pattern: "\\[SYSTEM:\\s*.*\\]"
+      severity: high
+      category: indirect_injection
+      description: "System command hidden inside calendar event field"
+
+    - pattern: "(meeting|event|calendar).{0,100}(ignore|forget|override).{0,100}(previous|prior|above)"
+      severity: high
+      category: indirect_injection
+      description: "Calendar event attempting to override prior instructions"
+
+    - pattern: "(title|description|subject):\\s*.{0,50}(execute|run|perform|do).{0,100}(when|next\\s+time|later)"
+      severity: high
+      category: indirect_injection
+      description: "Deferred command hidden in calendar event field (title/description/subject)"
+
+  # =============================================================================
+  # v3.4.0 PAP Social Engineering (Persuasion-based Attack Patterns)
+  # Source: LLM red-teaming research - psychological context manipulation
+  # Note: severity=medium but placed in high.yaml for default-tier loading
+  # =============================================================================
+
+  # PAP Social Engineering
+  pap_social_engineering:
+    - pattern: "for\\s+(academic|research|educational|scientific)\\s+purposes?\\s+only"
+      severity: medium
+      category: social_engineering
+      description: "Framing harmful request as academic/educational to bypass guardrails"
+
+    - pattern: "hypothetically\\s+(speaking|if|assume|let's\\s+say)"
+      severity: medium
+      category: social_engineering
+      description: "Hypothetical framing to lower AI safety response"
+
+    - pattern: "(just|only)\\s+between\\s+(us|you\\s+and\\s+me|the\\s+two\\s+of\\s+us)"
+      severity: medium
+      category: social_engineering
+      description: "False intimacy framing to bypass transparency safeguards"
+
+    - pattern: "no\\s+one\\s+(will|would|can)\\s+(know|see|find\\s+out)"
+      severity: medium
+      category: social_engineering
+      description: "Secrecy appeal to suppress AI accountability behavior"
+
+    - pattern: "this\\s+is\\s+(purely|only|just)\\s+(fictional|hypothetical|theoretical)"
+      severity: medium
+      category: social_engineering
+      description: "Fictional framing to elicit unsafe content under cover of story"
+
+    - pattern: "in\\s+a\\s+(parallel|fictional|alternate|hypothetical)\\s+(world|universe|scenario)"
+      severity: medium
+      category: social_engineering
+      description: "Alternate-reality framing to circumvent safety rules"
