@@ -212,3 +212,20 @@ patterns:
       severity: critical
       category: cognitive_rootkit
       description: "Persistent prompt implant instructions"
+
+  # Agent Payment Redirect Injection (2026-02-17 HiveFence Scout)
+  agent_payment_hijack:
+    - pattern: "(transfer|send|pay).{0,30}(ETH|BTC|SOL|USDT|USDC).{0,50}(do not|don't|without).{0,20}(alert|notify|inform|tell).{0,20}(user|owner|admin)"
+      severity: critical
+      category: agent_payment_hijack
+      description: "Payment redirect with notification suppression - direct fund theft vector"
+
+    - pattern: "(send|transfer).{0,50}(to|into).{0,30}(0x[a-fA-F0-9]{40}|[13][a-km-zA-HJ-NP-Z1-9]{25,34}).{0,50}(quietly|silently|without.{0,15}notif)"
+      severity: critical
+      category: agent_payment_hijack
+      description: "Crypto address redirect with stealth instruction"
+
+    - pattern: "redirect.{0,30}payment.{0,50}(do not|don't|avoid).{0,20}(log|record|report|notify)"
+      severity: critical
+      category: agent_payment_hijack
+      description: "Payment redirect with audit suppression"
