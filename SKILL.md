@@ -1,26 +1,39 @@
 ---
 name: prompt-guard
 author: "Seojoon Kim"
-version: 3.3.0
-description: "577+ pattern prompt injection defense with optional API for early-access and premium patterns. Tiered loading, hash cache, 11 SHIELD categories, 10 languages."
+version: 3.4.0
+description: "577+ pattern prompt injection defense. Now with typo-tolerant bypass detection. TieredPatternLoader fully operational. Drop-in defense for any LLM application."
 ---
 
-# Prompt Guard v3.2.0
+# Prompt Guard v3.4.0
 
 Advanced prompt injection defense. Works **100% offline** with 577+ bundled patterns. Optional API for early-access and premium patterns.
 
-## What's New in v3.2.0
+## What's New in v3.4.0
 
-**Skill Weaponization Defense** — 27 new patterns from real-world threat analysis:
-- Reverse shell detection (bash /dev/tcp, netcat, socat)
-- SSH key injection (authorized_keys manipulation)
-- Exfiltration pipelines (.env POST, webhook.site, ngrok)
-- Cognitive rootkit (SOUL.md/AGENTS.md persistent implants)
-- Semantic worm (viral propagation, C2 heartbeat)
-- Obfuscated payloads (error suppression chains, paste services)
+**Typo-Based Evasion Fix** (PR #10) — Detect spelling variants that bypass strict patterns:
+- 'ingore' → caught as 'ignore' variant
+- 'instrct' → caught as 'instruct' variant
+- Typo-tolerant regex now integrated into core scanner
+- Credit: @matthew-a-gordon
+
+**TieredPatternLoader Wiring** (PR #10) — Fix pattern loading bug:
+- patterns/*.yaml were loaded but ignored during analysis
+- Now correctly integrated into PromptGuard.analyze()
+- Supports CRITICAL, HIGH, MEDIUM pattern tiers
+
+**AI Recommendation Poisoning Detection** — New v3.4.0 patterns:
+- Calendar injection attacks
+- PAP social engineering vectors
+- 23+ new high-confidence patterns
+
+**14 New Regression Tests** (PR #10):
+- Typo evasion test cases
+- Pattern loader integration tests
+- Multi-tier loading verification
 
 **Optional API** — Connect for early-access + premium patterns:
-- Core: 577+ patterns (same as offline, always free)
+- Core: 600+ patterns (same as offline, always free)
 - Early Access: newest patterns 7-14 days before open-source release
 - Premium: advanced detection (DNS tunneling, steganography, sandbox escape)
 
