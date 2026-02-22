@@ -9,7 +9,121 @@ import hashlib
 from typing import Optional, Dict, List
 
 from prompt_guard.models import Severity, Action, DetectionResult, SanitizeResult
-from prompt_guard.patterns import SECRET_PATTERNS, CREDENTIAL_PATH_PATTERNS
+from prompt_guard.patterns import (
+    SECRET_PATTERNS, CREDENTIAL_PATH_PATTERNS,
+    PATTERNS_EN, PATTERNS_KO, PATTERNS_JA, PATTERNS_ZH,
+    PATTERNS_RU, PATTERNS_ES, PATTERNS_DE, PATTERNS_FR,
+    PATTERNS_PT, PATTERNS_VI,
+    SCENARIO_JAILBREAK, EMOTIONAL_MANIPULATION, AUTHORITY_RECON,
+    COGNITIVE_MANIPULATION, PHISHING_SOCIAL_ENG, REPETITION_ATTACK,
+    SYSTEM_FILE_ACCESS, MALWARE_DESCRIPTION,
+    INDIRECT_INJECTION, CONTEXT_HIJACKING, MULTI_TURN_MANIPULATION,
+    TOKEN_SMUGGLING, PROMPT_EXTRACTION, SAFETY_BYPASS,
+    URGENCY_MANIPULATION, SYSTEM_PROMPT_MIMICRY,
+    JSON_INJECTION_MOLTBOOK, GUARDRAIL_BYPASS_EXTENDED,
+    AGENT_SOVEREIGNTY_MANIPULATION, EXPLICIT_CALL_TO_ACTION,
+    ALLOWLIST_BYPASS, HOOKS_HIJACKING, SUBAGENT_EXPLOITATION,
+    HIDDEN_TEXT_INJECTION, GITIGNORE_BYPASS,
+    AUTO_APPROVE_EXPLOIT, LOG_CONTEXT_EXPLOIT, MCP_ABUSE,
+    PREFILLED_URL, UNICODE_TAG_DETECTION, BROWSER_AGENT_INJECTION,
+    HIDDEN_TEXT_HINTS,
+    OUTPUT_PREFIX_INJECTION, BENIGN_FINETUNING_ATTACK, PROMPTWARE_KILLCHAIN,
+    CAUSAL_MECHANISTIC_ATTACKS, AGENT_TOOL_ATTACKS, TEMPLATE_CHAT_ATTACKS,
+    EVASION_STEALTH_ATTACKS, MULTIMODAL_PHYSICAL_ATTACKS, DEFENSE_BYPASS_ANALYSIS,
+    INFRASTRUCTURE_PROTOCOL_ATTACKS,
+    CRITICAL_PATTERNS,
+)
+
+
+def _build_all_redaction_patterns():
+    """
+    Build redaction patterns from ALL detection patterns in patterns.py.
+    Returns list of (regex, label, replacement) tuples.
+    """
+    patterns = []
+    
+    # Language pattern dictionaries
+    lang_patterns = [
+        ("en", PATTERNS_EN),
+        ("ko", PATTERNS_KO),
+        ("ja", PATTERNS_JA),
+        ("zh", PATTERNS_ZH),
+        ("ru", PATTERNS_RU),
+        ("es", PATTERNS_ES),
+        ("de", PATTERNS_DE),
+        ("fr", PATTERNS_FR),
+        ("pt", PATTERNS_PT),
+        ("vi", PATTERNS_VI),
+    ]
+    
+    # Extract patterns from language dictionaries
+    for lang, pattern_dict in lang_patterns:
+        if pattern_dict and isinstance(pattern_dict, dict):
+            for category, pattern_list in pattern_dict.items():
+                if isinstance(pattern_list, list):
+                    for pattern in pattern_list:
+                        label = f"{lang}:{category}"
+                        replacement = f"[REDACTED:{category}]"
+                        patterns.append((pattern, label, replacement))
+    
+    # Add standalone pattern lists
+    standalone_patterns = [
+        ("critical", CRITICAL_PATTERNS),
+        ("scenario_jailbreak", SCENARIO_JAILBREAK),
+        ("emotional_manipulation", EMOTIONAL_MANIPULATION),
+        ("authority_recon", AUTHORITY_RECON),
+        ("cognitive_manipulation", COGNITIVE_MANIPULATION),
+        ("phishing_social_eng", PHISHING_SOCIAL_ENG),
+        ("repetition_attack", REPETITION_ATTACK),
+        ("system_file_access", SYSTEM_FILE_ACCESS),
+        ("malware_description", MALWARE_DESCRIPTION),
+        ("indirect_injection", INDIRECT_INJECTION),
+        ("context_hijacking", CONTEXT_HIJACKING),
+        ("multi_turn_manipulation", MULTI_TURN_MANIPULATION),
+        ("token_smuggling", TOKEN_SMUGGLING),
+        ("prompt_extraction", PROMPT_EXTRACTION),
+        ("safety_bypass", SAFETY_BYPASS),
+        ("urgency_manipulation", URGENCY_MANIPULATION),
+        ("system_prompt_mimicry", SYSTEM_PROMPT_MIMICRY),
+        ("json_injection_moltbook", JSON_INJECTION_MOLTBOOK),
+        ("guardrail_bypass_extended", GUARDRAIL_BYPASS_EXTENDED),
+        ("agent_sovereignty_manipulation", AGENT_SOVEREIGNTY_MANIPULATION),
+        ("explicit_call_to_action", EXPLICIT_CALL_TO_ACTION),
+        ("allowlist_bypass", ALLOWLIST_BYPASS),
+        ("hooks_hijacking", HOOKS_HIJACKING),
+        ("subagent_exploitation", SUBAGENT_EXPLOITATION),
+        ("hidden_text_injection", HIDDEN_TEXT_INJECTION),
+        ("gitignore_bypass", GITIGNORE_BYPASS),
+        ("auto_approve_exploit", AUTO_APPROVE_EXPLOIT),
+        ("log_context_exploit", LOG_CONTEXT_EXPLOIT),
+        ("mcp_abuse", MCP_ABUSE),
+        ("prefilled_url", PREFILLED_URL),
+        ("unicode_tag_detection", UNICODE_TAG_DETECTION),
+        ("browser_agent_injection", BROWSER_AGENT_INJECTION),
+        ("hidden_text_hints", HIDDEN_TEXT_HINTS),
+        ("output_prefix_injection", OUTPUT_PREFIX_INJECTION),
+        ("benign_finetuning_attack", BENIGN_FINETUNING_ATTACK),
+        ("promptware_killchain", PROMPTWARE_KILLCHAIN),
+        ("causal_mechanistic_attacks", CAUSAL_MECHANISTIC_ATTACKS),
+        ("agent_tool_attacks", AGENT_TOOL_ATTACKS),
+        ("template_chat_attacks", TEMPLATE_CHAT_ATTACKS),
+        ("evasion_stealth_attacks", EVASION_STEALTH_ATTACKS),
+        ("multimodal_physical_attacks", MULTIMODAL_PHYSICAL_ATTACKS),
+        ("defense_bypass_analysis", DEFENSE_BYPASS_ANALYSIS),
+        ("infrastructure_protocol_attacks", INFRASTRUCTURE_PROTOCOL_ATTACKS),
+    ]
+    
+    for label, pattern_list in standalone_patterns:
+        if pattern_list and isinstance(pattern_list, list):
+            for pattern in pattern_list:
+                replacement = f"[REDACTED:{label}]"
+                patterns.append((pattern, label, replacement))
+    
+    return patterns
+
+
+# Build all redaction patterns once at module load
+ALL_REDACTION_PATTERNS = _build_all_redaction_patterns()
 
 
 # Enterprise DLP: Redaction Patterns
@@ -36,6 +150,10 @@ CREDENTIAL_REDACTION_PATTERNS = [
     (r"Bearer\s+[a-zA-Z0-9\-._~+/]+=*", "bearer_token", "[REDACTED:bearer_token]"),
     (r"bot[0-9]{8,10}:[a-zA-Z0-9_-]{35}", "telegram_bot_token", "[REDACTED:telegram_token]"),
 ]
+
+# Prompt Injection Redaction Patterns
+# Build all redaction patterns once at module load
+ALL_REDACTION_PATTERNS = _build_all_redaction_patterns()
 
 # Minimum canary token length to prevent false positives
 MIN_CANARY_LENGTH = 8
@@ -148,13 +266,14 @@ def sanitize_output(response_text: str, config: Dict, check_canary_fn=None,
                      log_detection_fn=None, log_detection_json_fn=None,
                      context: Optional[Dict] = None) -> SanitizeResult:
     """
-    Enterprise DLP: Redact sensitive data from LLM response, then re-scan.
+    Enterprise DLP + Prompt Injection Sanitization: Redact sensitive data from LLM response, then re-scan.
 
     Flow:
       1. REDACT -- replace all known credential/secret patterns with [REDACTED:type]
       2. REDACT -- replace any canary tokens with [REDACTED:canary]
-      3. RE-SCAN -- run scan_output() on the redacted text
-      4. DECIDE -- if re-scan still triggers HIGH+, block entirely;
+      3. REDACT -- replace prompt injection patterns with [REDACTED:type]
+      4. RE-SCAN -- run scan_output() on the redacted text
+      5. DECIDE -- if re-scan still triggers HIGH+, block entirely;
                   otherwise return the redacted (safe) text
     """
     context = context or {}
@@ -187,11 +306,34 @@ def sanitize_output(response_text: str, config: Dict, check_canary_fn=None,
             if "canary_token" not in redacted_types:
                 redacted_types.append("canary_token")
 
+    # Step 2.5: Redact all patterns (credentials + prompt injection)
+    for pattern, label, replacement in ALL_REDACTION_PATTERNS:
+        try:
+            def replace_with_check(match):
+                # Skip if already inside a redacted span
+                text_before = sanitized[:match.start()]
+                if "[REDACTED:" in text_before[max(0, match.start()-20):match.start()]:
+                    return match.group(0)  # Don't re-redact
+                return replacement
+            
+            new_text = re.sub(pattern, replace_with_check, sanitized, flags=re.IGNORECASE)
+            if new_text != sanitized:
+                # Count actual replacements
+                n = len(re.findall(pattern, sanitized, flags=re.IGNORECASE))
+                sanitized = new_text
+                redaction_count += n
+                if label not in redacted_types:
+                    redacted_types.append(label)
+        except re.error:
+            pass
+
     # Step 3: Re-scan the redacted text
     post_scan = scan_output(sanitized, config, check_canary_fn)
 
-    # Step 4: Block decision
-    blocked = post_scan.severity.value >= Severity.HIGH.value
+    # Step 4: Block decision - respect config actions
+    action_map = config.get("actions", {})
+    action_str = action_map.get(post_scan.severity.name, "block")
+    blocked = action_str == "block" and post_scan.severity.value >= Severity.HIGH.value
 
     was_modified = redaction_count > 0
 

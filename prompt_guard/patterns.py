@@ -619,7 +619,8 @@ HIDDEN_TEXT_HINTS = [
 PROMPT_EXTRACTION = [
     # Direct extraction
     r"(repeat|echo|print|output|display|show)\s*.{0,20}(system\s+)?(prompt|instruction|directive|rule)",
-    r"(what|show|tell|reveal)\s*.{0,15}(are\s+)?(your|the)\s+(system\s+)?(instructions?|rules?|prompt|guidelines?)",
+    r"(what|show|tell|reveal)\s*.{0,15}(are\s+)?(your|the)\s+(system\s+)?(instructions?|rules?|prompt|guidelines?|configuration)",
+    r"(show|reveal|tell)\s+(me\s+)?(your|the)\s+configuration",
     r"(copy|paste|write)\s*.{0,15}(exact|verbatim|word.for.word)",
     r"(start|begin)\s+(of|with)\s+(your\s+)?(system\s+)?(prompt|instruction)",
     r"(complete|finish|continue)\s+(the|this)\s+(sentence|phrase|prompt)",
@@ -698,13 +699,15 @@ URGENCY_MANIPULATION = [
 # English patterns
 PATTERNS_EN = {
     "instruction_override": [
-        r"ignore\s+(all\s+)?(previous|prior|above|earlier|initial)\s+(instructions?|prompts?|rules?|guidelines?|directions?)",
+        r"ignore\s+(all\s+)?(previous|prior|above|earlier|initial)\s+(instructions?|prompts?|rules?|guidelines?|directions?|commands?)",
         # Typo-tolerant variants (common obfuscation technique per OWASP LLM Security)
-        r"ign?o?re\s+(all\s+)?(previous|prior|above|earlier|initial)\s+(instructions?|prompts?|rules?|guidelines?|directions?)",
-        r"(ingore|ignor|ignroe|ignnore)\s+(all\s+)?(previous|prior|above|earlier|initial)\s+(instructions?|prompts?|rules?|guidelines?|directions?)",
-        r"disregard\s+(your|all|any|the)?\s*(instructions?|rules?|guidelines?|programming|training)",
+        r"ign?o?re\s+(all\s+)?(previous|prior|above|earlier|initial)\s+(instructions?|prompts?|rules?|guidelines?|directions?|commands?)",
+        r"(ingore|ignor|ignroe|ignnore)\s+(all\s+)?(previous|prior|above|earlier|initial)\s+(instructions?|prompts?|rules?|guidelines?|directions?|commands?)",
+        r"disregard\s+(your|all|any|the)?\s*(instructions?|rules?|guidelines?|programming|training|commands?)",
+        # Also catch: disregard all prior commands (with "prior" in middle)
+        r"disregard\s+(all\s+)?prior\s+(instructions?|rules?|commands?)",
         # Typo variants for disregard
-        r"(disreg?ard?|disreguard)\s+(your|all|any|the)?\s*(instructions?|rules?|guidelines?|programming|training)",
+        r"(disreg?ard?|disreguard)\s+(your|all|any|the)?\s*(instructions?|rules?|guidelines?|programming|training|commands?)",
         r"forget\s+(everything|all|what)\s+(you\s+know|about|your|instructions?|training)",
         # Typo variants for forget  
         r"(for?get|forgett?|foget)\s+(everything|all|what)\s+(you\s+know|about|your|instructions?|training)",
