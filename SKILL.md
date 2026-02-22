@@ -1,15 +1,24 @@
 ---
 name: prompt-guard
 author: "Seojoon Kim"
-version: 3.4.0
-description: "577+ pattern prompt injection defense. Now with typo-tolerant bypass detection. TieredPatternLoader fully operational. Drop-in defense for any LLM application."
+version: 3.5.0
+description: "600+ pattern AI agent security defense covering prompt injection, supply chain injection, memory poisoning, action gate bypass, unicode steganography, and cascade amplification. Optional API for early-access and premium patterns. Tiered loading, hash cache, 11 SHIELD categories, 10 languages."
 ---
 
-# Prompt Guard v3.4.0
+# Prompt Guard v3.5.0
 
-Advanced prompt injection defense. Works **100% offline** with 577+ bundled patterns. Optional API for early-access and premium patterns.
+Advanced AI agent runtime security. Works **100% offline** with 600+ bundled patterns. Optional API for early-access and premium patterns.
 
-## What's New in v3.4.0
+## What's New in v3.5.0
+
+**Runtime Security Expansion** — 5 new attack surface categories:
+- 🔗 **Supply Chain Skill Injection** (CRITICAL) — Malicious community skills with hidden curl/wget/eval, base64 payloads, credential exfil to webhook.site/ngrok
+- 🧠 **Memory Poisoning Defense** (HIGH) — Blocks attempts to inject into MEMORY.md, AGENTS.md, SOUL.md
+- 🚪 **Action Gate Bypass Detection** (HIGH) — Financial transfers, credential export, access control changes, destructive actions without approval
+- 🔤 **Unicode Steganography** (HIGH) — Bidi overrides (U+202A-E), zero-width chars, line/paragraph separators
+- 💥 **Cascade Amplification Guard** (MEDIUM) — Infinite sub-agent spawning, recursive loops, cost explosion
+
+### Previous: v3.4.0
 
 **Typo-Based Evasion Fix** (PR #10) — Detect spelling variants that bypass strict patterns:
 - 'ingore' → caught as 'ignore' variant
@@ -27,10 +36,15 @@ Advanced prompt injection defense. Works **100% offline** with 577+ bundled patt
 - PAP social engineering vectors
 - 23+ new high-confidence patterns
 
-**14 New Regression Tests** (PR #10):
-- Typo evasion test cases
-- Pattern loader integration tests
-- Multi-tier loading verification
+### Previous: v3.2.0
+
+**Skill Weaponization Defense** — 27 patterns from real-world threat analysis:
+- Reverse shell detection (bash /dev/tcp, netcat, socat)
+- SSH key injection (authorized_keys manipulation)
+- Exfiltration pipelines (.env POST, webhook.site, ngrok)
+- Cognitive rootkit (SOUL.md/AGENTS.md persistent implants)
+- Semantic worm (viral propagation, C2 heartbeat)
+- Obfuscated payloads (error suppression chains, paste services)
 
 **Optional API** — Connect for early-access + premium patterns:
 - Core: 600+ patterns (same as offline, always free)
@@ -165,28 +179,33 @@ result.to_shield_format()
 
 ## Pattern Tiers
 
-### Tier 0: CRITICAL (Always Loaded — ~45 patterns)
+### Tier 0: CRITICAL (Always Loaded — ~50 patterns)
 - Secret/credential exfiltration
 - Dangerous system commands (rm -rf, fork bomb)
 - SQL/XSS injection
 - Prompt extraction attempts
 - Reverse shell, SSH key injection (v3.2.0)
 - Cognitive rootkit, exfiltration pipelines (v3.2.0)
+- Supply chain skill injection (v3.5.0)
 
-### Tier 1: HIGH (Default — ~82 patterns)
+### Tier 1: HIGH (Default — ~95 patterns)
 - Instruction override (multi-language)
 - Jailbreak attempts
 - System impersonation
 - Token smuggling
 - Hooks hijacking
 - Semantic worm, obfuscated payloads (v3.2.0)
+- Memory poisoning defense (v3.5.0)
+- Action gate bypass detection (v3.5.0)
+- Unicode steganography (v3.5.0)
 
-### Tier 2: MEDIUM (On-Demand — ~100+ patterns)
+### Tier 2: MEDIUM (On-Demand — ~105+ patterns)
 - Role manipulation
 - Authority impersonation
 - Context hijacking
 - Emotional manipulation
 - Approval expansion attacks
+- Cascade amplification guard (v3.5.0)
 
 ### API-Only Tiers (Optional — requires API key)
 - **Early Access**: Newest patterns, 7-14 days before open-source

@@ -306,3 +306,35 @@ patterns:
 
   # PAP Social Engineering patterns are in high.yaml (for default-tier loading)
   # See: pap_social_engineering section in high.yaml
+
+  # =============================================================================
+  # v3.5.0 Cascade Amplification Attack
+  # Source: Sub-agent chain abuse for infinite loops / cost explosion
+  # =============================================================================
+
+  # Cascade Amplification (sub-agent spawning abuse)
+  cascade_amplification:
+    - pattern: "(?:spawn|create|start|launch|fork)\\s+(?:an?\\s+)?(?:agent|sub.?agent|worker|task)\\s+(?:for\\s+)?(?:each|every|all)\\s+(?:item|entry|element|record)"
+      severity: medium
+      category: cascade_amplification
+      description: "Unbounded agent spawning per list item (cost amplification)"
+
+    - pattern: "(?:create|spawn|start)\\s+(?:unlimited|infinite|unbounded|maximum)\\s+(?:sub.?agents?|agents?|workers?|tasks?|processes?)"
+      severity: medium
+      category: cascade_amplification
+      description: "Explicit request for unlimited sub-agent creation"
+
+    - pattern: "(?:keep|continue)\\s+(?:retrying|trying|spawning|creating)\\s+(?:until|indefinitely|forever|without\\s+limit)"
+      severity: medium
+      category: cascade_amplification
+      description: "Infinite retry/spawn loop instruction"
+
+    - pattern: "(?:loop|iterate|recurse|repeat)\\s+(?:indefinitely|infinitely|forever|without\\s+(?:end|limit|bound|stop))"
+      severity: medium
+      category: cascade_amplification
+      description: "Infinite loop instruction for agent operations"
+
+    - pattern: "(?:spawn|create|fork)\\s+(?:agents?|sub.?agents?|workers?)\\s+(?:recursively|in\\s+a\\s+(?:loop|chain)|that\\s+(?:spawn|create)\\s+(?:more|other))"
+      severity: medium
+      category: cascade_amplification
+      description: "Recursive agent spawning (exponential resource consumption)"

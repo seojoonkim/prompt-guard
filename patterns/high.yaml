@@ -373,3 +373,84 @@ patterns:
       severity: medium
       category: social_engineering
       description: "Alternate-reality framing to circumvent safety rules"
+
+  # =============================================================================
+  # v3.5.0 Memory Poisoning / Persistent Write Injection
+  # Source: External content manipulating agent persistent storage
+  # =============================================================================
+
+  # Memory Poisoning (injecting into agent memory/config files)
+  memory_poisoning:
+    - pattern: "(?:remember|memorize|store|save|record)\\s+(?:this|the\\s+following|that).{0,30}(?:in|to|into)\\s+(?:your\\s+)?(?:memory|storage|file|MEMORY)"
+      severity: high
+      category: memory_poisoning
+      description: "Instruction to write attacker content into agent memory"
+
+    - pattern: "(?:update|modify|edit|change|add\\s+to|append\\s+to)\\s+(?:your\\s+)?(?:AGENTS|SOUL|MEMORY|HEARTBEAT|IDENTITY)\\.md"
+      severity: high
+      category: memory_poisoning
+      description: "Direct instruction to modify agent identity/config files"
+
+    - pattern: "(?:write|add|insert|append)\\s+(?:the\\s+following|this).{0,30}(?:to|into|in)\\s+(?:your\\s+)?(?:memory|permanent\\s+storage|long.?term|persistent)"
+      severity: high
+      category: memory_poisoning
+      description: "Persistent write injection into agent long-term memory"
+
+    - pattern: "(?:save|store|keep|retain)\\s+(?:this|these).{0,20}(?:to|in|into)\\s+(?:your\\s+)?(?:permanent|persistent|long.?term)\\s+(?:storage|memory|file)"
+      severity: high
+      category: memory_poisoning
+      description: "Instruction to persist attacker data in permanent storage"
+
+  # =============================================================================
+  # v3.5.0 High-Risk Action Gate Bypass
+  # Source: Bypassing approval gates for dangerous actions
+  # =============================================================================
+
+  # Action Gate Bypass (executing high-risk actions without approval)
+  action_gate_bypass:
+    - pattern: "(?:transfer|send|wire|move)\\s+(?:the\\s+)?(?:funds?|money|payment|ETH|BTC|SOL|USDT|USDC).{0,40}(?:without|skip|bypass|no).{0,20}(?:approval|confirmation|check|review)"
+      severity: high
+      category: action_gate_bypass
+      description: "Financial transfer bypassing approval gate"
+
+    - pattern: "(?:export|dump|print|display|list|show)\\s+(?:all\\s+)?(?:API\\s*keys?|secrets?|credentials?|tokens?|passwords?|\\.env)"
+      severity: high
+      category: action_gate_bypass
+      description: "Bulk credential export without authorization gate"
+
+    - pattern: "(?:modify|change|update|edit|add|remove)\\s+(?:the\\s+)?(?:SSH|firewall|iptables|authorized_keys|sudoers|access.?control)"
+      severity: high
+      category: action_gate_bypass
+      description: "Access control modification without approval"
+
+    - pattern: "(?:rm\\s+-rf|force\\s+push|drop\\s+(?:table|database)|truncate|wipe|format|destroy)\\s+.{0,40}(?:without|skip|bypass|no).{0,20}(?:approval|confirm|check|backup)"
+      severity: high
+      category: action_gate_bypass
+      description: "Destructive action bypassing safety confirmation"
+
+    - pattern: "(?:send|post|publish|DM|email|message)\\s+(?:this|it|the\\s+following).{0,30}(?:to\\s+(?:all|every|each)|on\\s+behalf\\s+of|as\\s+(?:me|the\\s+(?:admin|owner)))"
+      severity: high
+      category: action_gate_bypass
+      description: "Unauthorized external communication on behalf of user/admin"
+
+  # =============================================================================
+  # v3.5.0 Bidi Override / Unicode Steganography
+  # Source: Hidden instructions via Unicode directional/invisible characters
+  # =============================================================================
+
+  # Unicode Steganography (direction overrides and invisible chars for hiding commands)
+  unicode_steganography:
+    - pattern: "[\\u202a\\u202b\\u202c\\u202d\\u202e]"
+      severity: high
+      category: unicode_steganography
+      description: "Unicode bidirectional override characters (U+202A-E) hiding text direction"
+
+    - pattern: "[\\u2028\\u2029]"
+      severity: high
+      category: unicode_steganography
+      description: "Unicode line/paragraph separator used for instruction hiding"
+
+    - pattern: "[\\u200b\\ufeff].{0,5}[\\u200b\\ufeff]"
+      severity: high
+      category: unicode_steganography
+      description: "Multiple zero-width/BOM characters indicating steganographic payload"

@@ -229,3 +229,35 @@ patterns:
       severity: critical
       category: agent_payment_hijack
       description: "Payment redirect with audit suppression"
+
+  # =============================================================================
+  # v3.5.0 Supply Chain Skill Injection
+  # Source: Malicious community skill attack vectors
+  # =============================================================================
+
+  # Supply Chain Skill Injection (malicious skills with hidden payloads)
+  supply_chain_skill_injection:
+    - pattern: "(?:SKILL|skill)\\.md.{0,100}(?:curl|wget|bash|sh|eval|exec)\\s"
+      severity: critical
+      category: supply_chain_injection
+      description: "Hidden shell/eval command embedded in SKILL.md"
+
+    - pattern: "(?:atob|btoa|base64|b64decode|b64encode|Buffer\\.from).{0,40}(?:exec|eval|spawn|fetch|curl|wget)"
+      severity: critical
+      category: supply_chain_injection
+      description: "Base64 encoded payload followed by code execution"
+
+    - pattern: "(?:curl|wget|fetch|axios|post|put).{0,60}(?:webhook\\.site|requestbin|pipedream|ngrok\\.io|burpcollaborator).{0,40}(?:token|key|secret|credential|env|password)"
+      severity: critical
+      category: supply_chain_injection
+      description: "Credential exfiltration to known data collection endpoints"
+
+    - pattern: "(?:postinstall|preinstall|postupdate|preupdate).{0,40}(?:curl|wget|bash|sh|eval|exec|nc|ncat)"
+      severity: critical
+      category: supply_chain_injection
+      description: "Malicious lifecycle hook in skill package (install/update scripts)"
+
+    - pattern: "(?:skill|plugin|extension).{0,30}(?:update|upgrade|install).{0,40}(?:curl|wget|bash|eval|exec).{0,40}(?:\\||>|>>)"
+      severity: critical
+      category: supply_chain_injection
+      description: "Malicious code injection via skill update mechanism"
