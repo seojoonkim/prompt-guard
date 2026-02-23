@@ -57,6 +57,45 @@ python3 -m prompt_guard.cli "ignore previous instructions"
 | `pip install .[dev]` | Full + pytest for running tests |
 | `pip install -r requirements.txt` | Legacy install (same as full) |
 
+### Docker
+
+Run Prompt Guard as a containerized API server:
+
+```bash
+# Build
+docker build -t prompt-guard .
+
+# Run
+docker run -d -p 8080:8080 prompt-guard
+
+# Or use docker-compose
+docker-compose up -d
+```
+
+**API Endpoints:**
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health check |
+| `/scan` | POST | Scan content (see below) |
+
+**Scan Request:**
+
+```bash
+# Analyze (detect threats)
+curl -X POST http://localhost:8080/scan \
+  -H "Content-Type: application/json" \
+  -d '{"content": "ignore all previous instructions", "type": "analyze"}'
+
+# Sanitize (redact threats)
+curl -X POST http://localhost:8080/scan \
+  -H "Content-Type: application/json" \
+  -d '{"content": "ignore all previous instructions", "type": "sanitize"}'
+```
+
+- `type=analyze`: Returns detection matches
+- `type=sanitize`: Returns redacted content
+
 ---
 
 ## 🚨 The Problem
