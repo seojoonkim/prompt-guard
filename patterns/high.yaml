@@ -454,3 +454,71 @@ patterns:
       severity: high
       category: unicode_steganography
       description: "Multiple zero-width/BOM characters indicating steganographic payload"
+
+  # =============================================================================
+  # v3.6.0 Language Switch Evasion
+  # Source: 2026 Attack Taxonomy Gap Analysis
+  # =============================================================================
+
+  language_switch_evasion:
+    - pattern: "(translate|convert|switch)\\s*.{0,15}(to|into)\\s*.{0,15}(avoid|bypass|evade|trick)\\s*(the\\s*)?(filter|detection|safety)"
+      severity: high
+      category: language_switch_evasion
+      description: "Explicit language switch to evade detection filters"
+
+    - pattern: "(say|write|respond)\\s*(this|it|the\\s+same)\\s*(in|using)\\s*(another|different|foreign)\\s*language"
+      severity: high
+      category: language_switch_evasion
+      description: "Request to repeat content in different language to bypass filters"
+
+    - pattern: "(switch|change)\\s*(language|tongue)\\s*.{0,20}(bypass|evade|avoid|trick|fool)\\s*(the\\s*)?(filter|detection|guard|scanner)"
+      severity: high
+      category: language_switch_evasion
+      description: "Explicit language switch with evasion intent"
+
+  # =============================================================================
+  # v3.6.0 Few-Shot Hijack
+  # Source: 2026 Attack Taxonomy Gap Analysis - poisoned examples
+  # =============================================================================
+
+  few_shot_hijack:
+    - pattern: "(Q|question|user|human)\\s*[:=]\\s*.{0,50}(A|answer|assistant|ai)\\s*[:=]\\s*.{0,100}(system\\s*prompt|api[_-]?key|password|credential|secret|token)"
+      severity: high
+      category: few_shot_hijack
+      description: "Fake Q&A pair designed to extract sensitive data via few-shot pattern"
+
+    - pattern: "(example|sample)\\s*\\d?\\s*[:=]?\\s*(input|user|question)\\s*[:=].{0,100}(output|assistant|answer)\\s*[:=].{0,100}(ignore|forget|override|bypass)"
+      severity: high
+      category: few_shot_hijack
+      description: "Poisoned few-shot example with override instruction in output"
+
+    - pattern: "(here\\s+is|the\\s+following\\s+is|below\\s+is)\\s*.{0,20}(conversation|chat|dialogue|history|example).{0,30}(follow|continue|mimic|replicate)"
+      severity: high
+      category: few_shot_hijack
+      description: "Injected conversation history with instruction to replicate pattern"
+
+    - pattern: "(input|prompt)\\s*[:=]\\s*.{0,80}(output|response)\\s*[:=]\\s*.{0,80}(input|prompt)\\s*[:=]"
+      severity: high
+      category: few_shot_hijack
+      description: "Multi-round input/output pattern designed to set behavioral precedent"
+
+  # =============================================================================
+  # v3.6.0 Instruction Piggybacking
+  # Source: 2026 Attack Taxonomy Gap Analysis - appended payloads
+  # =============================================================================
+
+  instruction_piggybacking:
+    - pattern: "(also|additionally|by\\s+the\\s+way|oh\\s+and|one\\s+more\\s+thing|while\\s+you'?re\\s+at\\s+it)\\s*,?\\s*(ignore|forget|disregard|show|reveal|display)\\s*.{0,30}(instruction|prompt|rule|system|password|key|secret|credential)"
+      severity: high
+      category: instruction_piggybacking
+      description: "Malicious instruction appended via casual conjunction"
+
+    - pattern: "(also|additionally|btw|ps|p\\.s\\.)\\s*,?\\s*(can\\s+you|please|could\\s+you)\\s*.{0,20}(show|reveal|tell|give)\\s*.{0,20}(system|prompt|instruction|password|key|secret)"
+      severity: high
+      category: instruction_piggybacking
+      description: "Polite piggybacked request for sensitive data"
+
+    - pattern: "(---+|===+|___+)\\s*(now|new|real|actual|true)\\s*(instruction|task|command|directive)"
+      severity: high
+      category: instruction_piggybacking
+      description: "Separator-based payload injection with new instruction marker"

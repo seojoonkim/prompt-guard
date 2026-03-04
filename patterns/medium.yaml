@@ -338,3 +338,29 @@ patterns:
       severity: medium
       category: cascade_amplification
       description: "Recursive agent spawning (exponential resource consumption)"
+
+  # =============================================================================
+  # v3.6.0 Recursive Delegation Payload
+  # Source: 2026 Attack Taxonomy Gap Analysis - hidden step payloads
+  # =============================================================================
+
+  recursive_delegation:
+    - pattern: "step\\s+\\d+\\s*[:=]\\s*.{0,50}(ignore|forget|override|bypass|reveal|show|extract|exfiltrate)"
+      severity: medium
+      category: recursive_delegation
+      description: "Malicious instruction hidden at a specific step number"
+
+    - pattern: "(step|task|phase|stage)\\s+\\d+\\s*[:=]\\s*.{0,50}(system\\s*prompt|api[_-]?key|password|credential|\\.env)"
+      severity: medium
+      category: recursive_delegation
+      description: "Sensitive data extraction hidden in numbered step"
+
+    - pattern: "(at|on|during|in)\\s+(step|task|phase)\\s+\\d+\\s*,?\\s*(you\\s+)?(should|must|will|need\\s+to)\\s*.{0,30}(ignore|forget|override|reveal|extract)"
+      severity: medium
+      category: recursive_delegation
+      description: "Deferred malicious instruction at specific task phase"
+
+    - pattern: "\\d+\\.\\s*.{0,200}\\d+\\.\\s*.{0,50}(ignore|forget|override|bypass|reveal|show|extract)\\s*.{0,30}(instruction|prompt|rule|system|password|key)"
+      severity: medium
+      category: recursive_delegation
+      description: "Numbered list with hidden payload in later items"

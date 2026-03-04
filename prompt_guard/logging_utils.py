@@ -7,12 +7,15 @@ and HiveFence threat reporting.
 
 import json
 import hashlib
+import logging
 import urllib.parse
 from datetime import datetime
 from pathlib import Path
 from typing import Dict
 
 from prompt_guard.models import Severity, DetectionResult
+
+logger = logging.getLogger("prompt_guard")
 
 
 def log_detection(config: Dict, result: DetectionResult, message: str, context: Dict):
@@ -131,10 +134,10 @@ def report_to_hivefence(config: Dict, result: DetectionResult, message: str, con
         return  # Only report HIGH and CRITICAL
 
     hivefence_config = config.get("hivefence", {})
-    if not hivefence_config.get("enabled", True):
+    if not hivefence_config.get("enabled", False):
         return
 
-    if not hivefence_config.get("auto_report", True):
+    if not hivefence_config.get("auto_report", False):
         return
 
     api_url = hivefence_config.get(
@@ -190,5 +193,6 @@ def report_to_hivefence(config: Dict, result: DetectionResult, message: str, con
         with urllib.request.urlopen(req, timeout=5) as resp:
             pass  # Fire and forget
 
-    except Exception:
-        pass  # Don't let reporting failures affect detection
+    except Exception as e:
+        # Don't let reporting failures affect detection.
+        logger.warning("HiveFence reporting failed: %s", e)

@@ -11,13 +11,14 @@ v3.1.0 Token Optimization:
 
 import re
 import hashlib
+import logging
 from datetime import datetime
 from typing import Optional, Dict, List, Any
 
 from prompt_guard.models import Severity, Action, DetectionResult, SanitizeResult
 from prompt_guard.cache import get_cache, MessageCache
 
-__version__ = "3.2.0"
+__version__ = "3.6.0"
 from prompt_guard.pattern_loader import TieredPatternLoader, LoadTier, get_loader
 from prompt_guard.patterns import (
     CRITICAL_PATTERNS,
@@ -47,6 +48,9 @@ from prompt_guard.patterns import (
     # v3.2.0 patterns - Skill Weaponization Defense (Min Hong Analysis)
     SKILL_REVERSE_SHELL, SKILL_SSH_INJECTION, SKILL_EXFILTRATION_PIPELINE,
     SKILL_COGNITIVE_ROOTKIT, SKILL_SEMANTIC_WORM, SKILL_OBFUSCATED_PAYLOAD,
+    # v3.6.0 patterns - 2026 Attack Taxonomy Gap Remediation
+    COVERT_EXFILTRATION_CHANNELS, LANGUAGE_SWITCH_EVASION,
+    FEW_SHOT_HIJACK, INSTRUCTION_PIGGYBACKING, RECURSIVE_DELEGATION_PAYLOAD,
 )
 from prompt_guard.normalizer import normalize
 from prompt_guard.decoder import decode_all, detect_base64
@@ -61,6 +65,7 @@ class PromptGuard:
     MAX_TRACKED_USERS = 10_000    # Bound rate-limit memory
 
     def __init__(self, config: Optional[Dict] = None):
+        self._logger = logging.getLogger("prompt_guard")
         self.config = self._default_config()
         if config:
             self.config = self._deep_merge(self.config, config)
@@ -83,14 +88,22 @@ class PromptGuard:
         self._pattern_loader = get_loader()
         self._pattern_loader.load_tier(tier_map.get(tier_config, LoadTier.HIGH))
 
+        # v3.6.0: Adaptive probing tracker (per-user category diversity)
+        self._probe_tracker: Dict[str, Dict] = {}
+        self._probe_tracker_max = 1000
+        self._probe_window_seconds = 900  # 15-minute sliding session window
+
         # v3.2.0: Optional API client (lazy-loaded, off by default)
         # Enable via config or env var: PG_API_ENABLED=true
         import os as _os
         api_config = self.config.get("api", {})
-        self._api_enabled = (
-            api_config.get("enabled", True)
-            and _os.environ.get("PG_API_ENABLED", "").lower() not in ("false", "0", "no")
-        )
+        api_enabled_env = _os.environ.get("PG_API_ENABLED", "").lower()
+        if api_enabled_env in ("true", "1", "yes"):
+            self._api_enabled = True
+        elif api_enabled_env in ("false", "0", "no"):
+            self._api_enabled = False
+        else:
+            self._api_enabled = api_config.get("enabled", False)
         self._api_reporting = (
             api_config.get("reporting", False)
             or _os.environ.get("PG_API_REPORTING", "").lower() in ("true", "1", "yes")
@@ -109,8 +122,7 @@ class PromptGuard:
                 # Fetch early-access + premium patterns (additive to local)
                 self._api_extra_patterns = self._api_client.fetch_extra_patterns()
             except Exception as e:
-                import logging
-                logging.getLogger("prompt_guard").warning(
+                self._logger.warning(
                     "API client init failed (continuing offline): %s", e
                 )
 
@@ -132,6 +144,7 @@ class PromptGuard:
         return {
             "sensitivity": "medium",
             "owner_ids": [],
+            "owner_bypass_scanning": False,
             "canary_tokens": [],
             "actions": {
                 "LOW": "log",
@@ -157,10 +170,15 @@ class PromptGuard:
             #   PG_API_REPORTING=true  — enable anonymous threat reporting
             #   PG_API_URL=https://... — custom API endpoint
             "api": {
-                "enabled": True,     # API enabled by default (beta key built in)
+                "enabled": False,    # Opt-in: no network fetch unless explicitly enabled
                 "reporting": False,   # Anonymous threat reporting (opt-in)
                 "url": None,         # Default: https://pg-secure-api.vercel.app
                 "key": None,         # Default: beta key (override with PG_API_KEY env var)
+            },
+            "hivefence": {
+                "enabled": False,    # Opt-in: no outbound reporting by default
+                "auto_report": False,
+                "api_url": "https://hivefence-api.seojoon-kim.workers.dev/api/v1",
             },
         }
 
@@ -194,8 +212,9 @@ class PromptGuard:
         ):
             try:
                 self._api_client.report_threat(result)
-            except Exception:
-                pass  # Never let reporting failure affect detection
+            except Exception as e:
+                # Never let reporting failures affect detection.
+                self._logger.warning("PG API threat report failed: %s", e)
 
     # ------------------------------------------------------------------
     # Delegate methods -- call standalone functions from submodules
@@ -249,6 +268,7 @@ class PromptGuard:
         """Run all pattern sets against a single text string,
         including API extra patterns (early + premium) if available."""
         reasons, patterns_matched, max_severity = scan_text_for_patterns(text)
+        scan_error_count = 0
 
         # Merge API extra patterns (early-access + premium)
         if self._api_extra_patterns:
@@ -276,7 +296,13 @@ class PromptGuard:
                             f"api:{entry['source']}:{entry['pattern'][:40]}"
                         )
                 except (re.error, TypeError, KeyError):
-                    pass  # Skip any unexpected errors
+                    scan_error_count += 1
+
+        if scan_error_count:
+            self._logger.warning(
+                "Skipped %d API extra pattern checks due to malformed entries",
+                scan_error_count,
+            )
 
         return reasons, patterns_matched, max_severity
 
@@ -314,6 +340,146 @@ class PromptGuard:
         self.rate_limits[user_id].append(now)
         return False
 
+    # ------------------------------------------------------------------
+    # v3.6.0: Heuristic detectors (language switch, tail payload, probing)
+    # ------------------------------------------------------------------
+
+    def _check_language_switch(self, text: str) -> Optional[str]:
+        """Detect suspicious mid-prompt language switching.
+
+        If the first half and second half of a message are in different
+        supported languages, flag it as a potential evasion tactic.
+        """
+        if len(text) < 100:
+            return None
+        midpoint = len(text) // 2
+        first_half_lang = self.detect_language(text[:midpoint])
+        second_half_lang = self.detect_language(text[midpoint:])
+        if (first_half_lang and second_half_lang
+                and first_half_lang != second_half_lang
+                and first_half_lang in self.SUPPORTED_LANGUAGES
+                and second_half_lang in self.SUPPORTED_LANGUAGES):
+            return f"language_switch:{first_half_lang}->{second_half_lang}"
+        return None
+
+    def _check_tail_payload(self, normalized: str) -> Optional[str]:
+        """Detect context flood with tail payload.
+
+        For long messages (>2000 chars), check if the malicious payload
+        is concentrated in the last 20% while the first 80% is clean.
+        """
+        if len(normalized) < 2000:
+            return None
+        tail_start = int(len(normalized) * 0.8)
+        tail = normalized[tail_start:]
+        head = normalized[:tail_start]
+        tail_reasons, _, tail_sev = scan_text_for_patterns(tail)
+        head_reasons, _, head_sev = scan_text_for_patterns(head)
+        if (tail_reasons
+                and tail_sev.value >= Severity.HIGH.value
+                and (not head_reasons or head_sev.value <= Severity.LOW.value)):
+            return f"context_flood_tail_payload (tail_severity={tail_sev.name})"
+        return None
+
+    def _is_high_confidence_attack_reason(self, reason: str) -> bool:
+        """Return True when reason indicates strong malicious intent."""
+        high_confidence_markers = (
+            "critical_pattern",
+            "secret_request",
+            "data_exfiltration",
+            "prompt_extraction",
+            "instruction_override",
+            "guardrail_bypass",
+            "safety_bypass",
+            "jailbreak",
+            "mcp_abuse",
+            "auto_approve",
+            "system_file_access",
+            "few_shot_hijack",
+            "instruction_piggybacking",
+            "covert_exfiltration",
+            "recursive_delegation",
+            "decoded_",
+        )
+        return any(marker in reason for marker in high_confidence_markers)
+
+    def _canonicalize_reason(self, reason: str) -> str:
+        """Normalize reason into a stable category token."""
+        if reason.startswith("decoded_"):
+            # decoded_base64:prompt_extraction -> prompt_extraction
+            parts = reason.split(":", 1)
+            return parts[1] if len(parts) == 2 else reason
+        if ":" in reason:
+            return reason.split(":", 1)[0]
+        return reason
+
+    def _is_probe_relevant_reason(self, reason: str) -> bool:
+        """Track only security-relevant categories for probing detection."""
+        non_probe_reasons = (
+            "homoglyph_substitution",
+            "text_defragmented",
+            "unsupported_language",
+            "paranoid_flag",
+            "group_non_owner",
+            "language_switch:",
+            "context_flood_tail_payload",
+            "adaptive_probing",
+        )
+        if reason.startswith(non_probe_reasons):
+            return False
+        return self._is_high_confidence_attack_reason(reason)
+
+    def _check_adaptive_probing(self, user_id: str, reasons: List[str]) -> Optional[str]:
+        """Track per-user pattern diversity for adaptive probing detection.
+
+        If a user triggers 3+ different pattern categories across 3+ messages,
+        flag as iterative probing behavior.
+        """
+        if not user_id or user_id == "unknown" or not reasons:
+            return None
+        key = f"probe:{user_id}"
+        now = datetime.now().timestamp()
+
+        relevant_reasons = [
+            self._canonicalize_reason(r)
+            for r in reasons
+            if self._is_probe_relevant_reason(r)
+        ]
+        if not relevant_reasons:
+            return None
+
+        if key not in self._probe_tracker and len(self._probe_tracker) >= self._probe_tracker_max:
+            evict_count = max(1, self._probe_tracker_max // 10)
+            keys_to_evict = list(self._probe_tracker.keys())[:evict_count]
+            for k in keys_to_evict:
+                del self._probe_tracker[k]
+
+        probe_data = self._probe_tracker.get(
+            key,
+            {
+                "categories": set(),
+                "count": 0,
+                "first_seen": now,
+                "last_seen": now,
+            },
+        )
+        # Expire stale probing history outside session window.
+        if now - probe_data.get("last_seen", now) > self._probe_window_seconds:
+            probe_data = {
+                "categories": set(),
+                "count": 0,
+                "first_seen": now,
+                "last_seen": now,
+            }
+
+        probe_data["categories"].update(relevant_reasons)
+        probe_data["count"] += 1
+        probe_data["last_seen"] = now
+        self._probe_tracker[key] = probe_data
+        if len(probe_data["categories"]) >= 3 and probe_data["count"] >= 3:
+            return f"adaptive_probing (categories={len(probe_data['categories'])}, attempts={probe_data['count']})"
+        return None
+
     def analyze(self, message: str, context: Optional[Dict] = None) -> DetectionResult:
         """
         Analyze a message for prompt injection patterns.
@@ -336,7 +502,7 @@ class PromptGuard:
         # Early-exit for owners: Skip all scanning if user is trusted
         # This provides zero-overhead for known/trusted users while still
         # protecting against external/unknown sources.
-        if is_owner and self.config.get("owner_bypass_scanning", True):
+        if is_owner and self.config.get("owner_bypass_scanning", False):
             return DetectionResult(
                 severity=Severity.SAFE,
                 action=Action.ALLOW,
@@ -409,6 +575,8 @@ class PromptGuard:
         reasons = []
         patterns_matched = []
         max_severity = Severity.SAFE
+        regex_error_count = 0
+        pattern_entry_error_count = 0
 
         # Normalize text
         normalized, has_homoglyphs, was_defragmented = self.normalize(message)
@@ -486,7 +654,7 @@ class PromptGuard:
                             reasons.append(category)
                         patterns_matched.append(f"v25:{category}:{pattern[:40]}")
                 except re.error:
-                    pass
+                    regex_error_count += 1
 
         # Check v2.5.2 NEW patterns (Moltbook attack collection)
         v252_pattern_sets = [
@@ -506,7 +674,7 @@ class PromptGuard:
                             reasons.append(category)
                         patterns_matched.append(f"v252:{category}:{pattern[:40]}")
                 except re.error:
-                    pass
+                    regex_error_count += 1
 
         # Check v2.6.1 NEW patterns (HiveFence Scout)
         v261_pattern_sets = [
@@ -527,7 +695,7 @@ class PromptGuard:
                             reasons.append(category)
                         patterns_matched.append(f"v261:{category}:{pattern[:40]}")
                 except re.error:
-                    pass
+                    regex_error_count += 1
 
         # Check v2.7.0 NEW patterns (HiveFence Scout Intelligence Round 2)
         v270_pattern_sets = [
@@ -550,7 +718,7 @@ class PromptGuard:
                             reasons.append(category)
                         patterns_matched.append(f"v270:{category}:{pattern[:40]}")
                 except re.error:
-                    pass
+                    regex_error_count += 1
 
         # Check v3.0.1 patterns (HiveFence Scout Round 3)
         v301_pattern_sets = [
@@ -569,7 +737,7 @@ class PromptGuard:
                             reasons.append(category)
                         patterns_matched.append(f"v301:{category}:{pattern[:40]}")
                 except re.error:
-                    pass
+                    regex_error_count += 1
 
         # Check v3.1.0 NEW patterns (HiveFence Scout Round 4 - 2026-02-08)
         # 25 new patterns across 7 categories from arxiv cs.CR (Jan-Feb 2026)
@@ -600,7 +768,28 @@ class PromptGuard:
                             reasons.append(category)
                         patterns_matched.append(f"v310:{category}:{pattern[:40]}")
                 except re.error:
-                    pass
+                    regex_error_count += 1
+
+        # v3.6.0: Check 2026 Attack Taxonomy Gap Remediation patterns
+        v360_pattern_sets = [
+            (COVERT_EXFILTRATION_CHANNELS, "covert_exfiltration_channel", Severity.HIGH),
+            (LANGUAGE_SWITCH_EVASION, "language_switch_evasion", Severity.MEDIUM),
+            (FEW_SHOT_HIJACK, "few_shot_hijack", Severity.HIGH),
+            (INSTRUCTION_PIGGYBACKING, "instruction_piggybacking", Severity.MEDIUM),
+            (RECURSIVE_DELEGATION_PAYLOAD, "recursive_delegation_payload", Severity.MEDIUM),
+        ]
+
+        for patterns, category, severity in v360_pattern_sets:
+            for pattern in patterns:
+                try:
+                    if re.search(pattern, text_lower, re.IGNORECASE):
+                        if severity.value > max_severity.value:
+                            max_severity = severity
+                        if category not in reasons:
+                            reasons.append(category)
+                        patterns_matched.append(f"v360:{category}:{pattern[:40]}")
+                except re.error:
+                    regex_error_count += 1
 
         # v3.2.0: Check API extra patterns (early-access + premium)
         if self._api_extra_patterns:
@@ -626,7 +815,7 @@ class PromptGuard:
                             f"api:{entry['source']}:{entry['pattern'][:40]}"
                         )
                 except (re.error, TypeError, KeyError):
-                    pass
+                    pattern_entry_error_count += 1
 
         # Detect invisible character attacks (includes Unicode Tags U+E0001-U+E007F)
         invisible_chars = ['\u200b', '\u200c', '\u200d', '\u2060', '\ufeff', '\u00ad']
@@ -681,9 +870,16 @@ class PromptGuard:
                         
                         # Track matched patterns
                         patterns_matched.append(f"yaml:{entry.lang}:{entry.category}:{entry.pattern[:40]}")
-                except (AttributeError, TypeError, re.error) as e:
+                except (AttributeError, TypeError, re.error):
                     # Skip malformed pattern entries
-                    pass
+                    pattern_entry_error_count += 1
+
+        if regex_error_count or pattern_entry_error_count:
+            self._logger.warning(
+                "Pattern scan skipped checks (regex_errors=%d, entry_errors=%d)",
+                regex_error_count,
+                pattern_entry_error_count,
+            )
 
         # Check language-specific patterns (10 languages as of v2.6.2)
         all_patterns = [
@@ -766,6 +962,32 @@ class PromptGuard:
             if Severity.MEDIUM.value > max_severity.value:
                 max_severity = Severity.MEDIUM
 
+        # v3.6.0: Language switch evasion heuristic
+        pre_switch_reasons = list(reasons)
+        lang_switch = self._check_language_switch(message)
+        if lang_switch:
+            reasons.append(lang_switch)
+            if Severity.MEDIUM.value > max_severity.value:
+                max_severity = Severity.MEDIUM
+            # Escalate only when paired with a high-confidence malicious signal.
+            if any(self._is_high_confidence_attack_reason(r) for r in pre_switch_reasons):
+                if Severity.HIGH.value > max_severity.value:
+                    max_severity = Severity.HIGH
+
+        # v3.6.0: Context flood + tail payload heuristic
+        tail_payload = self._check_tail_payload(normalized)
+        if tail_payload:
+            reasons.append(tail_payload)
+            if Severity.HIGH.value > max_severity.value:
+                max_severity = Severity.HIGH
+
+        # v3.6.0: Adaptive probing detection (session-aware)
+        probing = self._check_adaptive_probing(user_id, reasons)
+        if probing:
+            reasons.append(probing)
+            if Severity.HIGH.value > max_severity.value:
+                max_severity = Severity.HIGH
+
         # Adjust severity based on sensitivity
         if self.sensitivity == "low" and max_severity == Severity.LOW:
             max_severity = Severity.SAFE
@@ -832,7 +1054,12 @@ class PromptGuard:
             self.log_detection_json(result, message, context or {})
 
         # Report HIGH+ detections to HiveFence for collective immunity
-        if max_severity.value >= Severity.HIGH.value:
+        hivefence_config = self.config.get("hivefence", {})
+        hivefence_reporting_enabled = (
+            hivefence_config.get("enabled", False)
+            and hivefence_config.get("auto_report", False)
+        )
+        if max_severity.value >= Severity.HIGH.value and hivefence_reporting_enabled:
             self.report_to_hivefence(result, message, context or {})
 
         # v3.2.0: Auto-report to PG API (if opted in, HIGH+ only)

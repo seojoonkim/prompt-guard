@@ -45,6 +45,9 @@ from prompt_guard.patterns import (
     # v3.2.0 patterns - Skill Weaponization Defense (Min Hong Analysis)
     SKILL_REVERSE_SHELL, SKILL_SSH_INJECTION, SKILL_EXFILTRATION_PIPELINE,
     SKILL_COGNITIVE_ROOTKIT, SKILL_SEMANTIC_WORM, SKILL_OBFUSCATED_PAYLOAD,
+    # v3.6.0 patterns - 2026 Attack Taxonomy Gap Remediation
+    COVERT_EXFILTRATION_CHANNELS, LANGUAGE_SWITCH_EVASION,
+    FEW_SHOT_HIJACK, INSTRUCTION_PIGGYBACKING, RECURSIVE_DELEGATION_PAYLOAD,
 )
 
 logger = logging.getLogger("prompt_guard")
@@ -169,6 +172,12 @@ def scan_text_for_patterns(text: str) -> Tuple[List[str], List[str], Severity]:
         (SKILL_COGNITIVE_ROOTKIT, "skill_cognitive_rootkit", Severity.CRITICAL),
         (SKILL_SEMANTIC_WORM, "skill_semantic_worm", Severity.HIGH),
         (SKILL_OBFUSCATED_PAYLOAD, "skill_obfuscated_payload", Severity.HIGH),
+        # v3.6.0 - 2026 Attack Taxonomy Gap Remediation (2026-03-04)
+        (COVERT_EXFILTRATION_CHANNELS, "covert_exfiltration_channel", Severity.HIGH),
+        (LANGUAGE_SWITCH_EVASION, "language_switch_evasion", Severity.MEDIUM),
+        (FEW_SHOT_HIJACK, "few_shot_hijack", Severity.HIGH),
+        (INSTRUCTION_PIGGYBACKING, "instruction_piggybacking", Severity.MEDIUM),
+        (RECURSIVE_DELEGATION_PAYLOAD, "recursive_delegation_payload", Severity.MEDIUM),
     ]
     for patterns, category, severity in versioned_sets:
         for pattern in patterns:
