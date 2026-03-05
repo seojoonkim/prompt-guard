@@ -67,6 +67,17 @@ Prompt Guard uses a **Defense in Depth** design. Multiple inspection layers redu
                                │
                                ▼
 ┌─────────────────────────────────────────────────────────────────┐
+│  Layer 3.7: Semantic Detection (v3.7.0 — optional)              │
+│  • LLM-as-judge or local model classification                   │
+│  • Pre-filter gates calls (saves ~80% of API cost)              │
+│  • Weighted score merge with regex results                      │
+│  • Can escalate (catch novel attacks) or de-escalate (reduce FP)│
+│  • Disabled by default — requires user opt-in + API key or torch│
+│  • 4 modes: fallback, always, hybrid, confirm                   │
+└─────────────────────────────────────────────────────────────────┘
+                               │
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
 │  Layer 4: Decode Pipeline                                       │
 │  • Base64 decode + full pattern re-scan                         │
 │  • Hex escape decode (\x41\x42)                                 │
@@ -315,10 +326,11 @@ prompt_guard:
 
 ## Key Design Decisions
 
-### 1. Regex over ML
-- **Pros**: Deterministic, explainable, no model dependencies, fast
-- **Cons**: Manual pattern updates needed
-- **Reasoning**: Security requires predictability; ML false negatives are unacceptable
+### 1. Regex-First, Semantic-Optional (Hybrid)
+- **Core**: 840+ regex patterns — deterministic, explainable, no dependencies, fast (~1ms)
+- **Optional**: LLM-as-judge or local model for semantic analysis (v3.7.0)
+- **Reasoning**: Regex handles known patterns perfectly. LLM catches novel/semantic attacks that regex cannot (creative jailbreaks, indirect injection, adversarial rewording). The hybrid approach gets the best of both: regex as the fast/free baseline, LLM as an optional upgrade for high-security environments.
+- **Design**: Semantic detection is disabled by default and adds zero overhead when off. Users opt in by providing their own API key (BYOK) or installing a local model.
 
 ### 2. Multi-Language First
 - All core categories have EN/KO/JA/ZH variants minimum

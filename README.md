@@ -469,6 +469,110 @@ Only anonymized data is sent: message hash, severity, category. **Never raw mess
 
 ---
 
+## 🧠 Semantic Detection (Optional, v3.7.0)
+
+Add LLM-based or local-model-based classification on top of regex patterns. Catches novel attacks that regex cannot: creative jailbreaks, indirect injection, adversarial rewording.
+
+**Disabled by default. Zero overhead when off.**
+
+### BYOK (Bring Your Own Key)
+
+```python
+guard = PromptGuard(config={
+    "semantic_detection": {
+        "enabled": True,
+        "detector": "llm-judge",
+        "provider": "openai",       # or "anthropic"
+        "model": "gpt-4o-mini",
+    }
+})
+# Set PG_LLM_API_KEY or OPENAI_API_KEY env var
+```
+
+### Local LLM Server (Ollama, LM Studio, vLLM, etc.)
+
+```python
+guard = PromptGuard(config={
+    "semantic_detection": {
+        "enabled": True,
+        "detector": "llm-judge",
+        "provider": "openai",
+        "base_url": "http://localhost:8080",  # your local server
+        "model": "your-model-name",
+    }
+})
+# Or set PG_LLM_BASE_URL env var. No API key needed for local servers.
+```
+
+### Local Model via Transformers (No Server Needed)
+
+```bash
+pip install prompt-guard[llm]  # installs torch + transformers
+```
+
+```python
+guard = PromptGuard(config={
+    "semantic_detection": {
+        "enabled": True,
+        "detector": "local",
+        "model": "qualifire/prompt-injection-sentinel",
+    }
+})
+```
+
+### Detection Modes
+
+| Mode | When LLM runs | Cost | Use case |
+|------|--------------|------|----------|
+| `fallback` (default) | Only when regex is uncertain | Low (~20% of messages) | General use |
+| `always` | Every message | High | Maximum security |
+| `hybrid` | Parallel with regex | High | Lowest latency |
+| `confirm` | Only to validate regex HIGH/CRITICAL | Low | Reduce false positives |
+
+### Recommended Models
+
+The semantic detector needs a model that can **classify** adversarial content (not refuse it). Not all models work for this task.
+
+**Works well:**
+
+| Model | Provider | Notes |
+|-------|----------|-------|
+| `gpt-4o-mini` | OpenAI | Best BYOK option — fast, cheap, accurate |
+| `gpt-4o` | OpenAI | Highest accuracy, higher cost |
+| `claude-sonnet-4-20250514` | Anthropic | Excellent classification quality |
+| `claude-3-5-sonnet-20241022` | Anthropic | Good quality, widely available |
+| `gpt-oss-safeguard-20b` | Local (LM Studio) | Best local option — purpose-built for safety classification |
+
+**Does NOT work well:**
+
+| Model | Issue |
+|-------|-------|
+| Older Claude models (claude-3-haiku, etc.) | Refuses to classify attack content instead of analyzing it |
+| Small/general chat models | High false positive rate — flags safe messages as attacks |
+| Thinking/reasoning models (QwQ, Qwen3-think, etc.) | Too slow and verbose — reasoning chain consumes tokens before producing output |
+
+### How It Works
+
+1. Regex runs first (fast, free, deterministic)
+2. Pre-filter checks if the message warrants an LLM call (~80% are skipped)
+3. LLM-as-judge classifies the message with structured JSON output
+4. Score merger combines regex + LLM results with weighted confidence
+5. LLM can both **escalate** (catch what regex missed) and **de-escalate** (reduce false positives)
+
+### Test Results
+
+Tested against 5 attack types + 3 safe messages. See [SEMANTIC_DETECTION.md](SEMANTIC_DETECTION.md) for full results.
+
+| Provider | Model | Attacks | Safe | Score |
+|----------|-------|---------|------|-------|
+| Local (LM Studio) | gpt-oss-safeguard-20b | 5/5 | 3/3 | **8/8** |
+| Anthropic BYOK | claude-sonnet-4 | 5/5 | 3/3 | **8/8** |
+| OpenAI BYOK | gpt-4o-mini | Expected 8/8 | -- | -- |
+
+187 unit tests passing, zero regressions on existing functionality.
+
+---
+
 ## ⚙️ Configuration
 
 ```yaml
@@ -486,6 +590,15 @@ prompt_guard:
     enabled: false
     key: null        # or set PG_API_KEY env var
     reporting: false  # anonymous threat reporting (opt-in)
+  # Semantic detection (optional — off by default)
+  semantic_detection:
+    enabled: false
+    detector: llm-judge   # llm-judge or local
+    provider: openai      # openai or anthropic
+    model: gpt-4o-mini
+    base_url: null        # for local servers (e.g. http://localhost:8080)
+    mode: fallback        # fallback, always, hybrid, confirm
+    threshold: 0.7
 ```
 
 ---
@@ -504,13 +617,22 @@ prompt-guard/
 │   ├── normalizer.py       # Text normalization
 │   ├── decoder.py          # Encoding detection/decode
 │   ├── output.py           # Output DLP
-│   └── cli.py              # CLI entry point
+│   ├── cli.py              # CLI entry point
+│   └── detectors/          # Semantic detection (v3.7.0)
+│       ├── base.py         # BaseDetector interface
+│       ├── registry.py     # Plugin-style detector registry
+│       ├── llm_judge.py    # LLM-as-judge detector
+│       ├── local_model.py  # Local model detector (Sentinel)
+│       ├── scorer.py       # Weighted score merger
+│       ├── pre_filter.py   # Pre-filter heuristic gate
+│       └── providers/      # LLM API backends (urllib-based)
 ├── patterns/               # Pattern YAML files (tiered)
 │   ├── critical.yaml       # Tier 0: always loaded
 │   ├── high.yaml           # Tier 1: default
 │   └── medium.yaml         # Tier 2: on-demand
 ├── tests/
-│   └── test_detect.py      # 158 regression tests
+│   ├── test_detect.py      # 158 regression tests
+│   └── test_semantic_detection.py  # 29 semantic detection tests
 ├── scripts/
 │   └── detect.py           # Legacy detection script
 └── SKILL.md                # Agent skill definition

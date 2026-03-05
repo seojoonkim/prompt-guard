@@ -49,9 +49,16 @@ dependencies = [
 lang = [
     "langdetect>=1.0.9",
 ]
+# Local model semantic detection (Sentinel / transformers-based)
+llm = [
+    "torch>=2.0",
+    "transformers>=4.30",
+]
 # Full install — all optional features
 full = [
     "langdetect>=1.0.9",
+    "torch>=2.0",
+    "transformers>=4.30",
 ]
 # Development / testing
 dev = [

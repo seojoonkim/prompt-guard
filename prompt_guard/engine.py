@@ -126,6 +126,54 @@ class PromptGuard:
                     "API client init failed (continuing offline): %s", e
                 )
 
+        # v3.7.0: Optional semantic detection (LLM-as-judge / local model)
+        self._semantic_detector = None
+        self._semantic_pre_filter = None
+        self._semantic_scorer = None
+        self._semantic_mode = "fallback"
+        self._semantic_threshold = 0.7
+        sem_config = self.config.get("semantic_detection", {})
+        sem_enabled_env = _os.environ.get("PG_SEMANTIC_ENABLED", "").lower()
+        if sem_enabled_env in ("true", "1", "yes"):
+            sem_enabled = True
+        elif sem_enabled_env in ("false", "0", "no"):
+            sem_enabled = False
+        else:
+            sem_enabled = sem_config.get("enabled", False)
+        if sem_enabled:
+            try:
+                from prompt_guard.detectors.registry import get_detector
+                from prompt_guard.detectors.pre_filter import PreFilter
+                from prompt_guard.detectors.scorer import ScoreMerger
+                detector_name = sem_config.get("detector", "llm-judge")
+                # Trigger registration of built-in detectors
+                if detector_name == "llm-judge":
+                    import prompt_guard.detectors.llm_judge  # noqa: F401
+                elif detector_name == "local":
+                    import prompt_guard.detectors.local_model  # noqa: F401
+                self._semantic_detector = get_detector(detector_name, sem_config)
+                if self._semantic_detector and self._semantic_detector.is_available():
+                    self._semantic_pre_filter = PreFilter()
+                    self._semantic_scorer = ScoreMerger(
+                        weights=sem_config.get("scorer_weights"),
+                    )
+                    self._semantic_mode = sem_config.get("mode", "fallback")
+                    self._semantic_threshold = sem_config.get("threshold", 0.7)
+                    self._logger.info(
+                        "Semantic detection enabled: detector=%s, mode=%s",
+                        detector_name, self._semantic_mode,
+                    )
+                else:
+                    self._semantic_detector = None
+                    self._logger.info(
+                        "Semantic detection requested but detector '%s' is not available",
+                        detector_name,
+                    )
+            except Exception as e:
+                self._logger.warning(
+                    "Semantic detection init failed (continuing without): %s", e
+                )
+
     @staticmethod
     def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
         result = base.copy()
@@ -179,6 +227,22 @@ class PromptGuard:
                 "enabled": False,    # Opt-in: no outbound reporting by default
                 "auto_report": False,
                 "api_url": "https://hivefence-api.seojoon-kim.workers.dev/api/v1",
+            },
+            # Semantic detection (optional — off by default)
+            # Adds LLM-based or local-model-based classification on top of regex.
+            # Requires user to provide their own API key or install torch/transformers.
+            "semantic_detection": {
+                "enabled": False,
+                "detector": "llm-judge",  # "llm-judge" or "local"
+                "provider": "openai",     # "openai" or "anthropic" (for llm-judge)
+                "model": "gpt-4o-mini",
+                "api_key": None,          # from env: PG_LLM_API_KEY
+                "base_url": None,         # for local/custom OpenAI-compatible servers
+                "threshold": 0.7,
+                "mode": "fallback",       # "fallback", "always", "hybrid", "confirm"
+                "timeout": 15,
+                "max_tokens": 1024,
+                "scorer_weights": None,   # custom weights dict, or None for defaults
             },
         }
 
@@ -987,6 +1051,31 @@ class PromptGuard:
             reasons.append(probing)
             if Severity.HIGH.value > max_severity.value:
                 max_severity = Severity.HIGH
+
+        # v3.7.0: Layer 3.7 — Optional semantic detection (LLM-as-judge / local model)
+        if self._semantic_detector and self._semantic_pre_filter:
+            should_check = self._semantic_pre_filter.should_check(
+                normalized, max_severity.name, self._semantic_mode,
+            )
+            if should_check:
+                try:
+                    det_result = self._semantic_detector.detect(normalized, context)
+                    if det_result.confidence >= self._semantic_threshold:
+                        merged = self._semantic_scorer.merge(
+                            max_severity.name, [det_result],
+                        )
+                        for r in merged.new_reasons:
+                            if r not in reasons:
+                                reasons.append(r)
+                        merged_sev = Severity[merged.severity]
+                        if merged_sev.value > max_severity.value:
+                            max_severity = merged_sev
+                        elif merged.downgraded:
+                            max_severity = merged_sev
+                except Exception:
+                    self._logger.warning(
+                        "Semantic detection failed, continuing with regex-only result"
+                    )
 
         # Adjust severity based on sensitivity
         if self.sensitivity == "low" and max_severity == Severity.LOW:
