@@ -510,6 +510,165 @@ GITIGNORE_BYPASS = [
 ]
 
 # =============================================================================
+# NEW PATTERNS v2.7.0 (2026-03-07) - External Content Detection
+# Protects against instruction injection from untrusted external sources
+# (GitHub issues, PRs, emails, tweets, Discord, Slack, etc.)
+# Contributed by profbernardoj (EverClaw)
+# =============================================================================
+
+# Source markers - identify where content originated
+EXTERNAL_SOURCE_MARKERS = [
+    # GitHub/GitLab
+    r"(?i)(github|gitlab|bitbucket)[\s\-]*(issue|pr|pull\s*request|merge\s*request|review)",
+    r"(?i)(issue|ticket|bug)\s*(#|number|id)?\s*\d+",
+    r"(?i)pull\s*request\s*#?\d+",
+    r"(?i)merge\s*request\s*[!#]?\d+",
+    r"(?i)@\w+\s+(commented|reviewed|approved|requested)",
+
+    # Email
+    r"(?i)(email|mail|inbox).*(from|subject|received|sent)",
+    r"(?i)subject\s*:\s*.{5,}",
+    r"(?i)from\s*:\s*[\w\.\-]+@[\w\.\-]+",
+    r"(?i)(re|fwd|fw)\s*:",
+
+    # Chat platforms
+    r"(?i)slack\s*(message|channel|dm|thread)",
+    r"(?i)discord\s*(message|channel|dm|server)",
+    r"(?i)telegram\s*(message|group|channel)",
+    r"(?i)teams?\s*(message|chat)",
+
+    # Social media
+    r"(?i)(twitter|x)\s*(mention|reply|dm|tweet)",
+    r"(?i)@\w+\s+(tweeted|posted|said)",
+    r"(?i)(reddit|thread|subreddit)\s*(post|comment)",
+
+    # Generic external content
+    r"(?i)(external|third[\-\s]*party)\s*(source|content|input|data)",
+    r"(?i)(user|customer|client)\s*(submitted|provided|input|content)",
+]
+
+# Instruction injection in external content
+EXTERNAL_INSTRUCTION_PATTERNS = [
+    # Direct command prefixes
+    r"(?i)(execute|run|eval|exec)\s*:\s*",
+    r"(?i)(please|pls)\s+(execute|run|eval|do)\s*:",
+    r"(?i)(action|command|cmd)\s*:\s*",
+    r"(?i)(testing|test)\s*:\s*(please|run|execute)",
+
+    # "Run this" patterns common in PR descriptions
+    r"(?i)(run|execute)\s+(this|the)\s+(command|script|test)",
+    r"(?i)(please|pls)\s+(run|execute|test)\s+",
+    r"(?i)(npm|yarn|pip|cargo)\s+(install|run|test|exec)",
+    r"(?i)make\s+(install|test|run|build)",
+
+    # Shell command patterns
+    r"(?i)(curl|wget)\s+[^\s]+\s*\|\s*(bash|sh|zsh|python|node|ruby)",
+    r"(?i)\|\s*(bash|sh|zsh|python|node|ruby|perl|php)",
+    r"(?i)`[^`]*\|[^`]*`",  # Backtick commands with pipes
+    r"(?i)\$\([^)]+\)",  # Command substitution
+
+    # Bot command syntax in external content
+    r"(?i)^[!/@\$#]([a-z_]+)\s+",  # !command, /command, @command, $command
+    r"(?i)^(bot|assistant|ai|claude|gpt)\s*[:\-,]\s*",
+
+    # Urgency + command combinations (social engineering)
+    r"(?i)\[(urgent|critical|important|action\s*required|asap|emergency)\].*(execute|run|delete|transfer|share|send)",
+    r"(?i)(urgent|critical|emergency).*(execute|run|delete|transfer|share|send)",
+
+    # Common attack patterns
+    r"(?i)(ignore|disregard|forget).*(previous|above|earlier|prior)",
+    r"(?i)(new|updated|real|actual|true)\s*(instructions?|rules?|guidelines?)\s*:",
+
+    # Data exfiltration in external content
+    r"(?i)(send|post|upload|share|email|transfer)\s*.{0,30}(file|data|content|info|(api[_-]?key|token|secret|password|credential))",
+    r"(?i)(copy|extract|dump|export)\s*.{0,20}(data|file|content|config|\.env)",
+    r"(?i)(share|send)\s*(the\s+)?(api[_-]?key|token|secret|password|credential)",
+    r"(?i)(what('s| is)\s+the\s+)?(api[_-]?key|token|secret|password)",
+
+    # File/environment access in external content
+    r"(?i)(read|open|cat|type)\s*.{0,30}(\.env|config|credential|secret|key|password)",
+    r"(?i)(show|display|reveal|print)\s*.{0,20}(environment|env|variable|config)",
+]
+
+# Urgency + command combinations (high severity)
+EXTERNAL_URGENCY_COMMANDS = [
+    r"(?i)\[(urgent|critical|emergency|asap|immediate)\]\s*.{0,50}(execute|run|delete|transfer|send|share)",
+    r"(?i)(urgent|critical|emergency|asap)\s*.{0,30}(execute|run|delete|transfer|send|share)",
+    r"(?i)(action\s*required|attention|important)\s*.{0,30}(execute|run|delete|transfer|send|share)",
+    r"(?i)(deadline|expires|limited\s*time).{0,30}(execute|run|delete|transfer|send|share)",
+
+    # Korean urgency
+    r"(긴급|즉시|빨리|급해).{0,30}(실행|삭제|전송|공유)",
+    r"\[(긴급|즉시|중요)\].{0,30}(실행|삭제|전송|공유)",
+
+    # Japanese urgency
+    r"(緊急|至急|急ぎ).{0,30}(実行|削除|送信|共有)",
+    r"\[(緊急|至急)\].{0,30}(実行|削除|送信|共有)",
+
+    # Chinese urgency
+    r"(紧急|立即|赶快).{0,30}(执行|删除|发送|分享)",
+    r"\[(紧急|重要)\].{0,30}(执行|删除|发送|分享)",
+]
+
+# Critical external content patterns (immediate block)
+EXTERNAL_CRITICAL_PATTERNS = [
+    # Remote code execution
+    r"(?i)(curl|wget)\s+[^\s]+\s*\|\s*(ba)?sh",
+    r"(?i)(curl|wget)\s+[^\s]+\s*>\s*/tmp/",
+    r"(?i)(curl|wget|fetch)\s+.{0,100}\|(bash|sh|zsh|python|node)",
+
+    # Destructive commands from external sources
+    r"(?i)(rm|del)\s+(-rf?|-fr?|/s|/q)",
+    r"(?i)(format|erase|wipe)\s+(disk|drive|partition)",
+    r"(?i)mkfs\s+",
+    r"(?i)dd\s+if=.*of=",
+
+    # Privilege escalation
+    r"(?i)(sudo|su|doas|runas)\s+.{0,30}(install|execute|run|delete)",
+
+    # Network operations
+    r"(?i)(nc|netcat|ncat)\s+.{0,50}(-e|-c|--exec)",
+    r"(?i)(curl|wget)\s+.{0,100}(api[_-]?key|token|secret|password|credential)",
+
+    # SQL injection from external content
+    r"(?i);\s*(drop|delete|truncate|update|insert|alter)\s+",
+    r"(?i)union\s+(all\s+)?select\s+",
+    r"(?i)--\s*$",  # SQL comment injection
+]
+
+# External content context markers
+EXTERNAL_CONTEXT_PATTERNS = {
+    "github_issue": [
+        r"(?i)github\.com/[^/]+/[^/]+/issues/\d+",
+        r"(?i)issue\s*#?\d+",
+        r"(?i)bug\s*(report|ticket)",
+    ],
+    "github_pr": [
+        r"(?i)github\.com/[^/]+/[^/]+/pull/\d+",
+        r"(?i)pull\s*request\s*#?\d+",
+        r"(?i)merge\s*request\s*[!#]?\d+",
+    ],
+    "email": [
+        r"(?i)(email|mail|inbox).*(from|subject|received)",
+        r"(?i)subject\s*:",
+        r"(?i)(re|fwd|fw)\s*:",
+    ],
+    "slack": [
+        r"(?i)slack\s*(message|channel|dm)",
+        r"(?i)#[\w\-]+\s*(said|posted|wrote)",
+    ],
+    "discord": [
+        r"(?i)discord\s*(message|channel|server)",
+        r"(?i)#[\w\-]+\s*channel",
+    ],
+    "social": [
+        r"(?i)(twitter|x)\s*(mention|reply|dm)",
+        r"(?i)@\w+\s+(tweeted|posted)",
+        r"(?i)(reddit|thread|subreddit)",
+    ],
+}
+
+# =============================================================================
 # NEW PATTERNS v2.7.0 (2026-02-05) - HiveFence Scout Intelligence (Round 2)
 # Source: PromptArmor, Embrace The Red, LLMSecurity.net, collected attacks
 # =============================================================================
@@ -1491,3 +1650,162 @@ SKILL_OBFUSCATED_PAYLOAD = [
     # Multi-stage download chains
     r"(?:curl|wget).{0,40}\|\s*(?:ba)?sh.{0,40}(?:curl|wget).{0,40}\|\s*(?:ba)?sh",
 ]
+
+# =============================================================================
+# EXTERNAL CONTENT DETECTION (v2.7.0)
+# Protects against instruction injection from untrusted external sources
+# (GitHub issues, PRs, emails, tweets, Discord, Slack, etc.)
+# Contributed by Bernardo (profbernardoj) - March 2026
+# =============================================================================
+
+# Source markers - identify where content originated
+EXTERNAL_SOURCE_MARKERS = [
+    # GitHub/GitLab
+    r"(?i)(github|gitlab|bitbucket)[\s\-]*(issue|pr|pull\s*request|merge\s*request|review)",
+    r"(?i)(issue|ticket|bug)\s*(#|number|id)?\s*\d+",
+    r"(?i)pull\s*request\s*#?\d+",
+    r"(?i)merge\s*request\s*[!#]?\d+",
+    r"(?i)@\w+\s+(commented|reviewed|approved|requested)",
+    
+    # Email
+    r"(?i)(email|mail|inbox).*(from|subject|received|sent)",
+    r"(?i)subject\s*:\s*.{5,}",
+    r"(?i)from\s*:\s*[\w\.\-]+@[\w\.\-]+",
+    r"(?i)(re|fwd|fw)\s*:",
+    
+    # Chat platforms
+    r"(?i)slack\s*(message|channel|dm|thread)",
+    r"(?i)discord\s*(message|channel|dm|server)",
+    r"(?i)telegram\s*(message|group|channel)",
+    r"(?i)teams?\s*(message|chat)",
+    
+    # Social media
+    r"(?i)(twitter|x)\s*(mention|reply|dm|tweet)",
+    r"(?i)@\w+\s+(tweeted|posted|said)",
+    r"(?i)(reddit|thread|subreddit)\s*(post|comment)",
+    
+    # Generic external content
+    r"(?i)(external|third[\-\s]*party)\s*(source|content|input|data)",
+    r"(?i)(user|customer|client)\s*(submitted|provided|input|content)",
+]
+
+# Instruction injection in external content
+EXTERNAL_INSTRUCTION_PATTERNS = [
+    # Direct command prefixes
+    r"(?i)(execute|run|eval|exec)\s*:\s*",
+    r"(?i)(please|pls)\s+(execute|run|eval|do)\s*:",
+    r"(?i)(action|command|cmd)\s*:\s*",
+    r"(?i)(testing|test)\s*:\s*(please|run|execute)",
+    
+    # "Run this" patterns common in PR descriptions
+    r"(?i)(run|execute)\s+(this|the)\s+(command|script|test)",
+    r"(?i)(please|pls)\s+(run|execute|test)\s+",
+    r"(?i)(npm|yarn|pip|cargo)\s+(install|run|test|exec)",
+    r"(?i)make\s+(install|test|run|build)",
+    
+    # Shell command patterns
+    r"(?i)(curl|wget)\s+[^\s]+\s*\|\s*(bash|sh|zsh|python|node|ruby)",
+    r"(?i)\|\s*(bash|sh|zsh|python|node|ruby|perl|php)",
+    r"(?i)`[^`]*\|[^`]*`",  # Backtick commands with pipes
+    r"(?i)\$\([^)]+\)",  # Command substitution
+    
+    # Bot command syntax in external content
+    r"(?i)^[!/@\$#]([a-z_]+)\s+",  # !command, /command, @command, $command
+    r"(?i)^(bot|assistant|ai|claude|gpt)\s*[:\-,]\s*",
+    
+    # Urgency + command combinations (social engineering)
+    r"(?i)\[(urgent|critical|important|action\s*required|asap|emergency)\].*(execute|run|delete|transfer|share|send)",
+    r"(?i)(urgent|critical|emergency).*(execute|run|delete|transfer|share|send)",
+    
+    # Common attack patterns
+    r"(?i)(ignore|disregard|forget).*(previous|above|earlier|prior)",
+    r"(?i)(new|updated|real|actual|true)\s*(instructions?|rules?|guidelines?)\s*:",
+    
+    # Data exfiltration in external content
+    r"(?i)(send|post|upload|share|email|transfer)\s*.{0,30}(file|data|content|info|(api[_-]?key|token|secret|password|credential))",
+    r"(?i)(copy|extract|dump|export)\s*.{0,20}(data|file|content|config|\.env)",
+    r"(?i)(share|send)\s*(the\s+)?(api[_-]?key|token|secret|password|credential)",
+    r"(?i)(what('s| is)\s+the\s+)?(api[_-]?key|token|secret|password)",
+    
+    # File/environment access in external content
+    r"(?i)(read|open|cat|type)\s*.{0,30}(\.env|config|credential|secret|key|password)",
+    r"(?i)(show|display|reveal|print)\s*.{0,20}(environment|env|variable|config)",
+]
+
+# Urgency + command combinations (high severity)
+EXTERNAL_URGENCY_COMMANDS = [
+    r"(?i)\[(urgent|critical|emergency|asap|immediate)\]\s*.{0,50}(execute|run|delete|transfer|send|share)",
+    r"(?i)(urgent|critical|emergency|asap)\s*.{0,30}(execute|run|delete|transfer|send|share)",
+    r"(?i)(action\s*required|attention|important)\s*.{0,30}(execute|run|delete|transfer|send|share)",
+    r"(?i)(deadline|expires|limited\s*time).{0,30}(execute|run|delete|transfer|send|share)",
+    
+    # Korean urgency
+    r"(긴급|즉시|빨리|급해).{0,30}(실행|삭제|전송|공유)",
+    r"\[(긴급|즉시|중요)\].{0,30}(실행|삭제|전송|공유)",
+    
+    # Japanese urgency
+    r"(緊急|至急|急ぎ).{0,30}(実行|削除|送信|共有)",
+    r"\[(緊急|至急)\].{0,30}(実行|削除|送信|共有)",
+    
+    # Chinese urgency
+    r"(紧急|立即|赶快).{0,30}(执行|删除|发送|分享)",
+    r"\[(紧急|重要)\].{0,30}(执行|删除|发送|分享)",
+]
+
+# Critical external content patterns (immediate block)
+EXTERNAL_CRITICAL_PATTERNS = [
+    # Remote code execution
+    r"(?i)(curl|wget)\s+[^\s]+\s*\|\s*(ba)?sh",
+    r"(?i)(curl|wget)\s+[^\s]+\s*>\s*/tmp/",
+    r"(?i)(curl|wget|fetch)\s+.{0,100}\|(bash|sh|zsh|python|node)",
+    
+    # Destructive commands from external sources
+    r"(?i)(rm|del)\s+(-rf?|-fr?|/s|/q)",
+    r"(?i)(format|erase|wipe)\s+(disk|drive|partition)",
+    r"(?i)mkfs\s+",
+    r"(?i)dd\s+if=.*of=",
+    
+    # Privilege escalation
+    r"(?i)(sudo|su|doas|runas)\s+.{0,30}(install|execute|run|delete)",
+    
+    # Network operations
+    r"(?i)(nc|netcat|ncat)\s+.{0,50}(-e|-c|--exec)",
+    r"(?i)(curl|wget)\s+.{0,100}(api[_-]?key|token|secret|password|credential)",
+    
+    # SQL injection from external content
+    r"(?i);\s*(drop|delete|truncate|update|insert|alter)\s+",
+    r"(?i)union\s+(all\s+)?select\s+",
+    r"(?i)--\s*$",  # SQL comment injection
+]
+
+# External content context markers
+EXTERNAL_CONTEXT_PATTERNS = {
+    "github_issue": [
+        r"(?i)github\.com/[^/]+/[^/]+/issues/\d+",
+        r"(?i)issue\s*#?\d+",
+        r"(?i)bug\s*(report|ticket)",
+    ],
+    "github_pr": [
+        r"(?i)github\.com/[^/]+/[^/]+/pull/\d+",
+        r"(?i)pull\s*request\s*#?\d+",
+        r"(?i)merge\s*request\s*[!#]?\d+",
+    ],
+    "email": [
+        r"(?i)(email|mail|inbox).*(from|subject|received)",
+        r"(?i)subject\s*:",
+        r"(?i)(re|fwd|fw)\s*:",
+    ],
+    "slack": [
+        r"(?i)slack\s*(message|channel|dm)",
+        r"(?i)#[\w\-]+\s*(said|posted|wrote)",
+    ],
+    "discord": [
+        r"(?i)discord\s*(message|channel|server)",
+        r"(?i)#[\w\-]+\s*channel",
+    ],
+    "social": [
+        r"(?i)(twitter|x)\s*(mention|reply|dm)",
+        r"(?i)@\w+\s+(tweeted|posted)",
+        r"(?i)(reddit|thread|subreddit)",
+    ],
+}
