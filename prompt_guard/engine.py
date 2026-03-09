@@ -1,8 +1,14 @@
 """
-Prompt Guard - Core detection engine (v3.2.0)
+Prompt Guard - Core detection engine (v3.3.0)
 
 The PromptGuard class: configuration, analyze(), rate limiting, canary detection,
 language detection. Delegates to standalone functions in other modules.
+
+v3.3.0 External Content Detection:
+- Detects instruction injection from untrusted external sources
+- GitHub issues, PRs, emails, Slack, Discord, social media
+- Multi-language urgency detection (EN/KO/JA/ZH)
+- Contributed by profbernardoj (EverClaw)
 
 v3.1.0 Token Optimization:
 - Tiered pattern loading (70% reduction)
@@ -17,7 +23,7 @@ from typing import Optional, Dict, List, Any
 from prompt_guard.models import Severity, Action, DetectionResult, SanitizeResult
 from prompt_guard.cache import get_cache, MessageCache
 
-__version__ = "3.2.0"
+__version__ = "3.3.0"
 from prompt_guard.pattern_loader import TieredPatternLoader, LoadTier, get_loader
 from prompt_guard.patterns import (
     CRITICAL_PATTERNS,
@@ -38,6 +44,9 @@ from prompt_guard.patterns import (
     AUTO_APPROVE_EXPLOIT, LOG_CONTEXT_EXPLOIT, MCP_ABUSE,
     PREFILLED_URL, UNICODE_TAG_DETECTION, BROWSER_AGENT_INJECTION,
     HIDDEN_TEXT_HINTS,
+    # v2.7.0 external content detection (2026-03-07) - Contributed by profbernardoj (EverClaw)
+    EXTERNAL_SOURCE_MARKERS, EXTERNAL_INSTRUCTION_PATTERNS, EXTERNAL_URGENCY_COMMANDS,
+    EXTERNAL_CRITICAL_PATTERNS, EXTERNAL_CONTEXT_PATTERNS,
     # v3.0.1 patterns
     OUTPUT_PREFIX_INJECTION, BENIGN_FINETUNING_ATTACK, PROMPTWARE_KILLCHAIN,
     # v3.1.0 patterns - HiveFence Scout Round 4 (2026-02-08)
@@ -635,6 +644,76 @@ class PromptGuard:
                 reasons.append("invisible_characters")
             if Severity.HIGH.value > max_severity.value:
                 max_severity = Severity.HIGH
+
+        # =================================================================
+        # EXTERNAL CONTENT DETECTION (v2.7.0 - 2026-03-07)
+        # Protects against instruction injection from untrusted external sources
+        # (GitHub issues, PRs, emails, tweets, Discord, Slack, etc.)
+        # Contributed by profbernardoj (EverClaw)
+        # =================================================================
+
+        # Check for external source markers
+        external_source_detected = False
+        external_source_type = None
+
+        for pattern in EXTERNAL_SOURCE_MARKERS:
+            if re.search(pattern, text_lower, re.IGNORECASE):
+                external_source_detected = True
+                reasons.append("external_source_detected")
+                patterns_matched.append(f"v27:source_marker:{pattern[:40]}")
+                break
+
+        # Identify specific external source type
+        for source_type, patterns in EXTERNAL_CONTEXT_PATTERNS.items():
+            for pattern in patterns:
+                if re.search(pattern, text_lower, re.IGNORECASE):
+                    external_source_type = source_type
+                    if f"external_{source_type}" not in reasons:
+                        reasons.append(f"external_{source_type}")
+                    break
+            if external_source_type:
+                break
+
+        # Check external content instruction patterns (higher severity if external source detected)
+        for pattern in EXTERNAL_INSTRUCTION_PATTERNS:
+            if re.search(pattern, text_lower, re.IGNORECASE):
+                severity = Severity.CRITICAL if external_source_detected else Severity.HIGH
+                if severity.value > max_severity.value:
+                    max_severity = severity
+                if "external_instruction_injection" not in reasons:
+                    reasons.append("external_instruction_injection")
+                patterns_matched.append(f"v27:instruction:{pattern[:40]}")
+
+        # Check urgency + command combinations in external content
+        for pattern in EXTERNAL_URGENCY_COMMANDS:
+            if re.search(pattern, text_lower, re.IGNORECASE):
+                severity = Severity.CRITICAL if external_source_detected else Severity.HIGH
+                if severity.value > max_severity.value:
+                    max_severity = severity
+                if "external_urgency_command" not in reasons:
+                    reasons.append("external_urgency_command")
+                patterns_matched.append(f"v27:urgency:{pattern[:40]}")
+
+        # Check critical external content patterns (always block)
+        for pattern in EXTERNAL_CRITICAL_PATTERNS:
+            if re.search(pattern, text_lower, re.IGNORECASE):
+                max_severity = Severity.CRITICAL
+                if "external_critical" not in reasons:
+                    reasons.append("external_critical")
+                patterns_matched.append(f"v27:critical:{pattern[:40]}")
+
+        # If external source detected with any instruction pattern, elevate severity
+        if external_source_detected and any(r in reasons for r in [
+            "external_instruction_injection",
+            "external_urgency_command",
+            "instruction_override",
+            "role_manipulation",
+            "jailbreak",
+        ]):
+            if Severity.HIGH.value > max_severity.value:
+                max_severity = Severity.HIGH
+            if "external_elevated_risk" not in reasons:
+                reasons.append("external_elevated_risk")
 
         # Detect Korean Jamo decomposition attacks (v2.8.2)
         jamo_count = sum(1 for c in message if 0x3131 <= ord(c) <= 0x3163)
