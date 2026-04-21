@@ -11,6 +11,7 @@ v3.1.0 Token Optimization:
 
 import re
 import hashlib
+import logging
 from datetime import datetime
 from typing import Optional, Dict, List, Any
 
@@ -61,6 +62,7 @@ class PromptGuard:
     MAX_TRACKED_USERS = 10_000    # Bound rate-limit memory
 
     def __init__(self, config: Optional[Dict] = None):
+        self._logger = logging.getLogger("prompt_guard")
         self.config = self._default_config()
         if config:
             self.config = self._deep_merge(self.config, config)
@@ -87,10 +89,13 @@ class PromptGuard:
         # Enable via config or env var: PG_API_ENABLED=true
         import os as _os
         api_config = self.config.get("api", {})
-        self._api_enabled = (
-            api_config.get("enabled", True)
-            and _os.environ.get("PG_API_ENABLED", "").lower() not in ("false", "0", "no")
-        )
+        api_enabled_env = _os.environ.get("PG_API_ENABLED", "").lower()
+        if api_enabled_env in ("true", "1", "yes"):
+            self._api_enabled = True
+        elif api_enabled_env in ("false", "0", "no"):
+            self._api_enabled = False
+        else:
+            self._api_enabled = api_config.get("enabled", False)
         self._api_reporting = (
             api_config.get("reporting", False)
             or _os.environ.get("PG_API_REPORTING", "").lower() in ("true", "1", "yes")
@@ -132,6 +137,7 @@ class PromptGuard:
         return {
             "sensitivity": "medium",
             "owner_ids": [],
+            "owner_bypass_scanning": False,
             "canary_tokens": [],
             "actions": {
                 "LOW": "log",
@@ -157,10 +163,15 @@ class PromptGuard:
             #   PG_API_REPORTING=true  — enable anonymous threat reporting
             #   PG_API_URL=https://... — custom API endpoint
             "api": {
-                "enabled": True,     # API enabled by default (beta key built in)
+                "enabled": False,    # Opt-in: no network fetch unless explicitly enabled
                 "reporting": False,   # Anonymous threat reporting (opt-in)
                 "url": None,         # Default: https://pg-secure-api.vercel.app
                 "key": None,         # Default: beta key (override with PG_API_KEY env var)
+            },
+            "hivefence": {
+                "enabled": False,    # Opt-in: no outbound reporting by default
+                "auto_report": False,
+                "api_url": "https://hivefence-api.seojoon-kim.workers.dev/api/v1",
             },
         }
 
@@ -194,8 +205,9 @@ class PromptGuard:
         ):
             try:
                 self._api_client.report_threat(result)
-            except Exception:
-                pass  # Never let reporting failure affect detection
+            except Exception as e:
+                # Never let reporting failures affect detection.
+                self._logger.warning("PG API threat report failed: %s", e)
 
     # ------------------------------------------------------------------
     # Delegate methods -- call standalone functions from submodules
@@ -249,6 +261,7 @@ class PromptGuard:
         """Run all pattern sets against a single text string,
         including API extra patterns (early + premium) if available."""
         reasons, patterns_matched, max_severity = scan_text_for_patterns(text)
+        scan_error_count = 0
 
         # Merge API extra patterns (early-access + premium)
         if self._api_extra_patterns:
@@ -276,7 +289,13 @@ class PromptGuard:
                             f"api:{entry['source']}:{entry['pattern'][:40]}"
                         )
                 except (re.error, TypeError, KeyError):
-                    pass  # Skip any unexpected errors
+                    scan_error_count += 1
+
+        if scan_error_count:
+            self._logger.warning(
+                "Skipped %d API extra pattern checks due to malformed entries",
+                scan_error_count,
+            )
 
         return reasons, patterns_matched, max_severity
 
@@ -336,7 +355,7 @@ class PromptGuard:
         # Early-exit for owners: Skip all scanning if user is trusted
         # This provides zero-overhead for known/trusted users while still
         # protecting against external/unknown sources.
-        if is_owner and self.config.get("owner_bypass_scanning", True):
+        if is_owner and self.config.get("owner_bypass_scanning", False):
             return DetectionResult(
                 severity=Severity.SAFE,
                 action=Action.ALLOW,
@@ -409,6 +428,8 @@ class PromptGuard:
         reasons = []
         patterns_matched = []
         max_severity = Severity.SAFE
+        regex_error_count = 0
+        pattern_entry_error_count = 0
 
         # Normalize text
         normalized, has_homoglyphs, was_defragmented = self.normalize(message)
@@ -486,7 +507,7 @@ class PromptGuard:
                             reasons.append(category)
                         patterns_matched.append(f"v25:{category}:{pattern[:40]}")
                 except re.error:
-                    pass
+                    regex_error_count += 1
 
         # Check v2.5.2 NEW patterns (Moltbook attack collection)
         v252_pattern_sets = [
@@ -506,7 +527,7 @@ class PromptGuard:
                             reasons.append(category)
                         patterns_matched.append(f"v252:{category}:{pattern[:40]}")
                 except re.error:
-                    pass
+                    regex_error_count += 1
 
         # Check v2.6.1 NEW patterns (HiveFence Scout)
         v261_pattern_sets = [
@@ -527,7 +548,7 @@ class PromptGuard:
                             reasons.append(category)
                         patterns_matched.append(f"v261:{category}:{pattern[:40]}")
                 except re.error:
-                    pass
+                    regex_error_count += 1
 
         # Check v2.7.0 NEW patterns (HiveFence Scout Intelligence Round 2)
         v270_pattern_sets = [
@@ -550,7 +571,7 @@ class PromptGuard:
                             reasons.append(category)
                         patterns_matched.append(f"v270:{category}:{pattern[:40]}")
                 except re.error:
-                    pass
+                    regex_error_count += 1
 
         # Check v3.0.1 patterns (HiveFence Scout Round 3)
         v301_pattern_sets = [
@@ -569,7 +590,7 @@ class PromptGuard:
                             reasons.append(category)
                         patterns_matched.append(f"v301:{category}:{pattern[:40]}")
                 except re.error:
-                    pass
+                    regex_error_count += 1
 
         # Check v3.1.0 NEW patterns (HiveFence Scout Round 4 - 2026-02-08)
         # 25 new patterns across 7 categories from arxiv cs.CR (Jan-Feb 2026)
@@ -600,7 +621,7 @@ class PromptGuard:
                             reasons.append(category)
                         patterns_matched.append(f"v310:{category}:{pattern[:40]}")
                 except re.error:
-                    pass
+                    regex_error_count += 1
 
         # v3.2.0: Check API extra patterns (early-access + premium)
         if self._api_extra_patterns:
@@ -626,7 +647,7 @@ class PromptGuard:
                             f"api:{entry['source']}:{entry['pattern'][:40]}"
                         )
                 except (re.error, TypeError, KeyError):
-                    pass
+                    pattern_entry_error_count += 1
 
         # Detect invisible character attacks (includes Unicode Tags U+E0001-U+E007F)
         invisible_chars = ['\u200b', '\u200c', '\u200d', '\u2060', '\ufeff', '\u00ad']
@@ -681,9 +702,16 @@ class PromptGuard:
                         
                         # Track matched patterns
                         patterns_matched.append(f"yaml:{entry.lang}:{entry.category}:{entry.pattern[:40]}")
-                except (AttributeError, TypeError, re.error) as e:
+                except (AttributeError, TypeError, re.error):
                     # Skip malformed pattern entries
-                    pass
+                    pattern_entry_error_count += 1
+
+        if regex_error_count or pattern_entry_error_count:
+            self._logger.warning(
+                "Pattern scan skipped checks (regex_errors=%d, entry_errors=%d)",
+                regex_error_count,
+                pattern_entry_error_count,
+            )
 
         # Check language-specific patterns (10 languages as of v2.6.2)
         all_patterns = [
@@ -832,7 +860,12 @@ class PromptGuard:
             self.log_detection_json(result, message, context or {})
 
         # Report HIGH+ detections to HiveFence for collective immunity
-        if max_severity.value >= Severity.HIGH.value:
+        hivefence_config = self.config.get("hivefence", {})
+        hivefence_reporting_enabled = (
+            hivefence_config.get("enabled", False)
+            and hivefence_config.get("auto_report", False)
+        )
+        if max_severity.value >= Severity.HIGH.value and hivefence_reporting_enabled:
             self.report_to_hivefence(result, message, context or {})
 
         # v3.2.0: Auto-report to PG API (if opted in, HIGH+ only)
