@@ -659,7 +659,18 @@ prompt-guard/
 
 ## 📋 Changelog
 
-### v3.6.0 (March 4, 2026) — *Latest*
+### v3.7.0 (March 5, 2026) — *Latest*
+- 🧠 **Semantic Detection Layer** — optional LLM-based classification on top of regex patterns; catches novel attacks regex cannot (creative jailbreaks, indirect injection, adversarial rewording)
+- 🔌 **Pluggable detector architecture** — `BaseDetector` interface, `Registry` lookup, swappable components in `prompt_guard/detectors/`
+- 🤖 **LLM-as-Judge** — structured JSON classification via `LLMJudgeDetector` with `OpenAIProvider` and `AnthropicProvider`
+- 🏠 **Local-model support** — `LocalModelDetector` (Sentinel-style transformer) and OpenAI-compatible local servers (Ollama, LM Studio, vLLM, llama.cpp, LocalAI)
+- 🔑 **BYOK (Bring Your Own Key)** — user-supplied API keys via `PG_LLM_API_KEY` / `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` env vars; no vendor lock-in
+- ⚡ **Pre-filter gating** — keyword heuristic skips LLM calls on obviously benign input (~80% skip rate) for cost/latency control
+- 🎯 **Score merger** — weighted confidence merge between regex pipeline and semantic detector
+- 🚦 **Disabled by default / zero overhead** — semantic layer only runs when explicitly configured
+- 🧪 **New test suite** — `tests/test_semantic_detection.py` (362 lines) covering detectors, providers, pre-filter, and scorer
+
+### v3.6.0 (March 4, 2026)
 - 🔍 **2026 Attack Taxonomy Gap Remediation** — 5 new pattern sets (44 patterns), 3 engine heuristics
   - `COVERT_EXFILTRATION_CHANNELS`: emoji encoding, acrostic/first-letter, Morse/binary, reverse output, nth-character interleaving — steganographic output attacks that bypass output DLP
   - `LANGUAGE_SWITCH_EVASION`: mid-prompt language switching to evade keyword filters; engine heuristic escalates to HIGH when paired with attack signal

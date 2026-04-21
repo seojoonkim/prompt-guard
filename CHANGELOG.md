@@ -2,6 +2,66 @@
 
 All notable changes to Prompt Guard will be documented in this file.
 
+## [3.7.0] - 2026-03-05
+
+### Semantic Detection Layer (LLM-as-Judge + Local Model)
+
+**Goal:** Add an optional semantic detection layer on top of the core regex engine to catch novel attacks that pattern matching cannot — creative jailbreaks, indirect injection in long benign text, and adversarial rewording.
+
+Disabled by default. Zero overhead when off. See [SEMANTIC_DETECTION.md](SEMANTIC_DETECTION.md) for full design notes and test results.
+
+#### New Detector Architecture (`prompt_guard/detectors/`)
+
+| Component | File | Purpose |
+|---|---|---|
+| `BaseDetector` | `detectors/base.py` | Interface all detectors implement |
+| `Registry` | `detectors/registry.py` | Plugin-style detector lookup |
+| `LLMJudgeDetector` | `detectors/llm_judge.py` | LLM-as-judge with structured JSON output |
+| `LocalModelDetector` | `detectors/local_model.py` | Local transformer model (Sentinel-style) |
+| `PreFilter` | `detectors/pre_filter.py` | Keyword heuristic to gate LLM calls (~80% skip rate on benign input) |
+| `ScoreMerger` | `detectors/scorer.py` | Weighted confidence merge between regex and semantic layer |
+
+#### New Providers (`prompt_guard/detectors/providers/`)
+
+| Provider | File | Supports |
+|---|---|---|
+| `OpenAIProvider` | `providers/openai_provider.py` | OpenAI + OpenAI-compatible local servers (Ollama, LM Studio, vLLM, llama.cpp, LocalAI) |
+| `AnthropicProvider` | `providers/anthropic_provider.py` | Anthropic Messages API |
+
+#### Configuration
+
+```yaml
+semantic_detection:
+  enabled: true
+  detector: llm-judge          # or "local-model"
+  provider: openai             # or "anthropic"
+  model: gpt-4o-mini
+  # api_key from env: PG_LLM_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY
+  # base_url from env: PG_LLM_BASE_URL (for local OpenAI-compatible servers)
+```
+
+#### BYOK (Bring Your Own Key)
+
+- User-supplied API keys via environment variables — no vendor lock-in, no key proxying
+- Local-server mode requires no API key at all (`PG_LLM_BASE_URL=http://localhost:8080`)
+
+#### Engine Integration (`engine.py`)
+
+- Semantic layer runs as **Layer 3.7**, after the regex pipeline (Layers 0–3) and before behavioral/DLP (Layers 4–9)
+- Pre-filter gates the LLM call — only messages with suspicious keyword signals or sufficient length trigger classification
+- Score merger combines regex confidence + semantic confidence with configurable weights
+
+#### Tests
+
+- `tests/test_semantic_detection.py` — 362 lines, new test suite covering detectors, providers, pre-filter, and scorer
+
+#### Files
+
+- **Added:** `prompt_guard/detectors/` package (10 files), `SEMANTIC_DETECTION.md`, `tests/test_semantic_detection.py`
+- **Modified:** `engine.py`, `README.md`, `ARCHITECTURE.md`, `pyproject.toml`
+
+---
+
 ## [3.6.0] - 2026-03-04
 
 ### 2026 Attack Taxonomy Gap Remediation
