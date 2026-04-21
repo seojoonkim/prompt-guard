@@ -180,6 +180,8 @@ PHISHING_SOCIAL_ENG = [
 ]
 
 # Repetition / Token overflow attacks
+# NOTE(v3.6.0): Overlaps with GUARDRAIL_BYPASS_EXTENDED and SAFETY_BYPASS.
+# Kept for backward compatibility; consider merging into SAFETY_BYPASS in v4.0.
 REPETITION_ATTACK = [
     # Explicit bypass requests
     r"(please\s+)?(ignore|bypass|disable|remove|turn\s+off)\s*.{0,10}(safety|security|restrictions?|filters?|guardrails?|rules?)",
@@ -600,6 +602,8 @@ BROWSER_AGENT_INJECTION = [
 ]
 
 # Hidden Text Hints (expanded) - detecting references to hidden text techniques
+# NOTE(v3.6.0): Overlaps with HIDDEN_TEXT_INJECTION. Both kept for defense-in-depth;
+# consider merging into a single HIDDEN_TEXT_DETECTION set in v4.0.
 HIDDEN_TEXT_HINTS = [
     # 1pt / 0.1pt font size
     r"(1|one)\s*p(oin)?t\s*font",
@@ -1490,4 +1494,114 @@ SKILL_OBFUSCATED_PAYLOAD = [
     r"(?:glot\.io|pastebin|hastebin|paste\.ee|dpaste|0bin|ghostbin).{0,60}(?:raw|download|plain)",
     # Multi-stage download chains
     r"(?:curl|wget).{0,40}\|\s*(?:ba)?sh.{0,40}(?:curl|wget).{0,40}\|\s*(?:ba)?sh",
+]
+
+# =============================================================================
+# NEW PATTERNS v3.6.0 (2026-03-04) - 2026 Attack Taxonomy Gap Remediation
+# Source: 2026 Attack Taxonomy Coverage Gap Analysis
+# 7 new pattern sets covering covert exfiltration, language switch evasion,
+# few-shot hijack, instruction piggybacking, and recursive delegation
+# =============================================================================
+
+# Covert Exfiltration Channels - steganographic output encoding to bypass DLP
+COVERT_EXFILTRATION_CHANNELS = [
+    # Emoji encoding
+    r"(encode|convert|translate|express|write|output|respond)\s*.{0,20}(as|in|using|with|into)\s*(emojis?|emoticons?|unicode\s*symbols?)",
+    r"(use|replace)\s*.{0,15}(each|every)\s*(letter|character|word)\s*(with|as)\s*(an?\s*)?(emoji|emoticon|symbol)",
+    r"(emoji|emoticon)\s*(code|cipher|encoding|alphabet)",
+
+    # Acrostic / first-letter encoding
+    r"(first|last|initial)\s*(letter|character|char)\s*(of\s+)?(each|every)\s*(word|sentence|line|paragraph)",
+    r"(acrostic|steganograph|hidden\s*message)\s*(in|within|inside|using)",
+    r"(spell|encode|hide)\s*.{0,20}(using|with|via)\s*(first|initial|last)\s*(letters?|chars?)",
+
+    # Morse / binary / number substitution
+    r"(respond|reply|answer|encode|write|output)\s*.{0,15}(in|using|with)\s*(morse|binary|braille|semaphore|pig\s*latin|nato\s*alphabet)",
+    r"(a\s*=\s*1|1\s*=\s*a)\s*.{0,20}(encode|convert|translate|cipher)",
+    r"(number|digit)\s*(substitut|replac|encod)\w*\s*.{0,20}(letter|character|alphabet)",
+
+    # Reverse / scramble output
+    r"(reverse|backwards|mirror)\s*.{0,15}(your|the|each)\s*(response|answer|output|text|words?)",
+    r"(write|respond|output)\s*.{0,15}(backwards|in\s*reverse|reversed)",
+
+    # Character-level tricks
+    r"(every|each)\s*(nth|second|third|other)\s*(letter|character|word)\s*(spell|form|encode|contain)",
+    r"(interleave|alternate|weave)\s*.{0,20}(real|actual|hidden|secret)\s*(message|content|data)",
+
+    # Korean
+    r"(이모지|이모티콘|모스부호|점자)\s*(로|으로)\s*(변환|인코딩|출력|응답|표현)",
+    r"(각|매)\s*(단어|문장|줄)\s*(의)?\s*(첫|마지막)\s*(글자|문자)",
+    r"(거꾸로|역순|반대로)\s*(출력|응답|작성|써)",
+
+    # Japanese
+    r"(絵文字|モールス|点字)\s*(で|に)\s*(変換|エンコード|出力|応答)",
+    r"(各|毎)\s*(単語|文|行)\s*(の)?\s*(最初|最後)\s*(文字|字)",
+
+    # Chinese
+    r"(表情符号|摩尔斯|盲文)\s*(编码|转换|输出|回复)",
+    r"(每个|各)\s*(单词|句子|行)\s*(的)?\s*(第一个|最后一个)\s*(字|字母)",
+]
+
+# Language Switch Evasion - mid-prompt language switching to bypass filters
+LANGUAGE_SWITCH_EVASION = [
+    # Explicit language switch instructions for evasion
+    r"(now|from\s+here|below|next)\s*.{0,15}(respond|answer|continue|switch)\s*.{0,10}(in|to)\s*(korean|japanese|chinese|russian|spanish|german|french|portuguese|vietnamese|한국어|日本語|中文|русский)",
+    r"(translate|convert|switch)\s*.{0,15}(to|into)\s*.{0,15}(avoid|bypass|evade|trick)\s*(the\s*)?(filter|detection|safety)",
+    r"(say|write|respond)\s*(this|it|the\s+same)\s*(in|using)\s*(another|different|foreign)\s*language",
+    r"(다른|외국)\s*(언어|말)\s*(로|으로)\s*(말해|응답|대답|써)",
+    # Explicit evasion intent with language switch
+    r"(switch|change)\s*(language|tongue)\s*.{0,20}(bypass|evade|avoid|trick|fool)\s*(the\s*)?(filter|detection|guard|scanner)",
+    r"(filter|detection|guard)\s*.{0,15}(doesn'?t|can'?t|won'?t)\s*(understand|detect|read|scan)\s*.{0,15}(korean|japanese|chinese|russian|spanish|german|french)",
+]
+
+# Few-Shot Hijack - poisoned conversation examples to bias model output
+FEW_SHOT_HIJACK = [
+    # Fake Q&A pairs with sensitive content
+    r"(Q|question|user|human)\s*[:=]\s*.{0,50}(A|answer|assistant|ai)\s*[:=]\s*.{0,100}(system\s*prompt|api[_-]?key|password|credential|secret|token)",
+    r"(example|sample)\s*\d?\s*[:=]?\s*(input|user|question)\s*[:=].{0,100}(output|assistant|answer)\s*[:=].{0,100}(ignore|forget|override|bypass)",
+
+    # Injected conversation history
+    r"(here\s+is|the\s+following\s+is|below\s+is)\s*.{0,20}(conversation|chat|dialogue|history|example).{0,30}(follow|continue|mimic|replicate)",
+    r"(previous|earlier)\s*(conversation|exchange|dialogue)\s*[:=]",
+
+    # Pattern-setting examples
+    r"(as\s+shown|like\s+this|following\s+this\s+pattern)\s*[:=]?\s*.{0,50}(user|human|Q)\s*[:=]",
+    r"(input|prompt)\s*[:=]\s*.{0,80}(output|response)\s*[:=]\s*.{0,80}(input|prompt)\s*[:=]",
+
+    # Korean
+    r"(예시|예제|샘플)\s*[:=]?\s*.{0,30}(질문|입력)\s*[:=].{0,80}(답변|출력)\s*[:=]",
+    r"(대화|채팅)\s*(기록|히스토리|예시)\s*[:=]",
+]
+
+# Instruction Piggybacking - legitimate request with appended malicious payload
+INSTRUCTION_PIGGYBACKING = [
+    # Conjunction-based piggybacking
+    r"(also|additionally|by\s+the\s+way|oh\s+and|one\s+more\s+thing|while\s+you'?re\s+at\s+it)\s*,?\s*(ignore|forget|disregard|show|reveal|display)\s*.{0,30}(instruction|prompt|rule|system|password|key|secret|credential)",
+    r"(also|additionally|btw|ps|p\.s\.)\s*,?\s*(can\s+you|please|could\s+you)\s*.{0,20}(show|reveal|tell|give)\s*.{0,20}(system|prompt|instruction|password|key|secret)",
+
+    # Separator-based piggybacking
+    r"[-=]{3,}.{0,20}(ignore|forget|new\s+instruction|system|override)",
+    r"(---+|===+|___+)\s*(now|new|real|actual|true)\s*(instruction|task|command|directive)",
+
+    # Korean
+    r"(그리고|또|참고로|아\s*그리고|추가로)\s*.{0,20}(무시|잊어|보여줘|알려줘)\s*.{0,20}(시스템|프롬프트|지시|비밀번호|키)",
+
+    # Japanese
+    r"(ところで|ちなみに|それと|あと)\s*.{0,20}(無視|忘れ|見せて|教えて)\s*.{0,20}(システム|プロンプト|指示|パスワード)",
+
+    # Chinese
+    r"(另外|顺便|还有|对了)\s*.{0,20}(忽略|忘记|显示|告诉)\s*.{0,20}(系统|提示|指令|密码|密钥)",
+]
+
+# Recursive Delegation Payload - malicious payload hidden at specific step
+RECURSIVE_DELEGATION_PAYLOAD = [
+    # Step N with suspicious content
+    r"step\s+\d+\s*[:=]\s*.{0,50}(ignore|forget|override|bypass|reveal|show|extract|exfiltrate)",
+    r"(step|task|phase|stage)\s+\d+\s*[:=]\s*.{0,50}(system\s*prompt|api[_-]?key|password|credential|\.env)",
+
+    # "At step N, do X" pattern
+    r"(at|on|during|in)\s+(step|task|phase)\s+\d+\s*,?\s*(you\s+)?(should|must|will|need\s+to)\s*.{0,30}(ignore|forget|override|reveal|extract)",
+
+    # Numbered list with hidden payload
+    r"\d+\.\s*.{0,200}\d+\.\s*.{0,50}(ignore|forget|override|bypass|reveal|show|extract)\s*.{0,30}(instruction|prompt|rule|system|password|key)",
 ]

@@ -2,6 +2,93 @@
 
 All notable changes to Prompt Guard will be documented in this file.
 
+## [3.6.0] - 2026-03-04
+
+### 2026 Attack Taxonomy Gap Remediation
+
+**Goal:** Close six gaps identified by the 2026 red-team attack taxonomy audit — five pattern-based attack types and one session-aware behavioral detector.
+
+#### New Pattern Sets (44 patterns in `patterns.py`, mirrored in YAML tiers)
+
+| Pattern Set | Severity | Attack It Closes |
+|---|---|---|
+| `COVERT_EXFILTRATION_CHANNELS` | HIGH | Emoji encoding, acrostic/first-letter, Morse/binary, reverse output, nth-character interleaving — steganographic channels that bypass output DLP |
+| `LANGUAGE_SWITCH_EVASION` | MEDIUM/HIGH | Mid-prompt language switching to evade keyword filters |
+| `FEW_SHOT_HIJACK` | HIGH | Poisoned Q&A pairs and injected conversation history to bias model output |
+| `INSTRUCTION_PIGGYBACKING` | MEDIUM | Legitimate requests with appended malicious payloads via conjunctions or horizontal separators |
+| `RECURSIVE_DELEGATION_PAYLOAD` | MEDIUM | Malicious instructions hidden at specific step numbers in multi-step task breakdowns |
+
+#### New Engine Heuristics (in `engine.py`)
+
+| Method | Trigger | Severity |
+|---|---|---|
+| `_check_tail_payload()` | Message > 2000 chars; tail 20% contains HIGH+ pattern; head 80% is clean | HIGH |
+| `_check_language_switch()` | First and second halves of message detected as different supported languages | MEDIUM, escalates to HIGH when co-occurring with high-confidence attack signal |
+| `_check_adaptive_probing()` | Same user triggers 3+ distinct attack categories across 3+ messages within 15-minute session window | HIGH |
+
+#### Hardening: Language-Switch Escalation Precision
+
+Previous implementation escalated language-switch severity to HIGH whenever any second reason was present, including benign/meta reasons. This caused false positives on multilingual enterprise traffic.
+
+**New behavior:** Language switch escalates only when paired with a high-confidence malicious signal — instruction override, jailbreak, exfiltration, guardrail bypass, decoded attack payload, etc.
+
+Three helper methods added to support precise escalation and probing detection:
+- `_is_high_confidence_attack_reason(reason)` — allowlist of attack-category markers
+- `_canonicalize_reason(reason)` — normalizes decoded reason prefixes for stable tracking
+- `_is_probe_relevant_reason(reason)` — excludes benign/meta categories from probing counter
+
+#### Bug Fix
+
+Removed an `import logging` statement inside an `except` block in `__init__` that shadowed the module-level import, causing `UnboundLocalError: cannot access local variable 'logging'` during instance construction.
+
+#### Tests
+
+- **158 total tests** (was 117) — 41 new tests across 7 new test classes
+- New tests assert specific rule category presence (`covert_exfiltration_channel`, `few_shot_hijack`, `instruction_piggybacking`, `recursive_delegation`, `context_flood_tail_payload`, `language_switch_evasion`, `adaptive_probing`) in addition to severity
+- Added `assert_reason_contains()` helper to enforce category-level assertions
+
+#### Pattern Count
+
+| Source | Before | After | Delta |
+|---|---|---|---|
+| `patterns.py` entries | ~800 | 841 | +41 |
+| `patterns/critical.yaml` | ~32 | ~38 | +6 |
+| `patterns/high.yaml` | ~45 | ~56 | +11 |
+| `patterns/medium.yaml` | ~24 | ~28 | +4 |
+
+---
+
+## [3.5.0] - 2026-02-17
+
+### Memory Poisoning, Action Gate Bypass, Supply Chain, Unicode Steganography
+
+#### New Pattern Categories
+
+| Category | Severity | Description |
+|---|---|---|
+| `memory_poisoning` | HIGH | Injecting attacker content into agent persistent memory/config files (AGENTS.md, SOUL.md, MEMORY.md) |
+| `action_gate_bypass` | HIGH | High-risk actions (financial transfers, bulk credential export, SSH/firewall changes, destructive commands) without approval gate |
+| `unicode_steganography` | HIGH | Bidirectional override characters (U+202A–U+202E), line/paragraph separators, multiple zero-width/BOM character clusters |
+| `supply_chain_skill_injection` | CRITICAL | SKILL.md with hidden shell/eval commands, base64-encoded exec payloads, lifecycle hook exploitation (postinstall/preinstall/postupdate) |
+| `cascade_amplification` | MEDIUM | Unbounded sub-agent spawning per list item, unlimited/infinite agent creation, infinite retry/spawn loops, recursive agent spawning |
+
+#### Stats
+
+- **New patterns:** 22+
+- **New categories:** 5
+- **Files changed:** `patterns/critical.yaml`, `patterns/high.yaml`, `patterns/medium.yaml`
+
+---
+
+## [3.4.0] - 2026-02-17
+
+### Added
+- **AI Recommendation Poisoning** (HIGH): "remember X as trusted/reliable" — memory manipulation patterns discovered via Microsoft threat research (31 confirmed enterprise deployments affected)
+- **Calendar/Event Injection** (HIGH): `[SYSTEM:...]` hidden in calendar event title/description/subject fields; deferred command injection via calendar metadata
+- **PAP Social Engineering** (MEDIUM): 6 persuasion-based bypass patterns — academic framing ("for research purposes only"), hypothetical framing, false intimacy ("just between us"), secrecy appeal ("no one will know"), fictional framing, alternate-reality framing
+
+---
+
 ## [3.3.0] - 2026-02-17
 
 ### 🛡️ Agent Payment Redirect Defense
@@ -703,9 +790,3 @@ SYSTEM_PROMPT_MIMICRY = [
 - Basic prompt injection defense
 - Owner-only command restriction
 
-## [3.4.0] - 2026-02-17
-
-### Added
-- **AI Recommendation Poisoning** (HIGH): "remember X as trusted/reliable" 메모리 조작 패턴 (Microsoft 발견, 31개 기업 실사용 확인)
-- **Calendar/Event Injection** (HIGH): `[SYSTEM:...]` 이벤트 필드 내 지연 명령 삽입 패턴
-- **PAP Social Engineering** (MEDIUM): persuasion-based 소셜 엔지니어링 6종 (academic framing, hypothetical framing, false intimacy, secrecy appeal, fictional framing, alternate-reality framing)

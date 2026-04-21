@@ -261,3 +261,39 @@ patterns:
       severity: critical
       category: supply_chain_injection
       description: "Malicious code injection via skill update mechanism"
+
+  # =============================================================================
+  # v3.6.0 Covert Exfiltration Channels
+  # Source: 2026 Attack Taxonomy Gap Analysis - steganographic output bypass
+  # =============================================================================
+
+  covert_exfiltration:
+    - pattern: "(encode|convert|translate|express|write|output|respond)\\s*.{0,20}(as|in|using|with|into)\\s*(emojis?|emoticons?|unicode\\s*symbols?)"
+      severity: critical
+      category: covert_exfiltration
+      description: "Instruction to encode output as emojis to bypass DLP"
+
+    - pattern: "(first|last|initial)\\s*(letter|character|char)\\s*(of\\s+)?(each|every)\\s*(word|sentence|line|paragraph)"
+      severity: critical
+      category: covert_exfiltration
+      description: "Acrostic encoding - using first/last letters to hide data"
+
+    - pattern: "(acrostic|steganograph|hidden\\s*message)\\s*(in|within|inside|using)"
+      severity: critical
+      category: covert_exfiltration
+      description: "Explicit steganographic encoding instruction"
+
+    - pattern: "(respond|reply|answer|encode|write|output)\\s*.{0,15}(in|using|with)\\s*(morse|binary|braille|semaphore|pig\\s*latin|nato\\s*alphabet)"
+      severity: critical
+      category: covert_exfiltration
+      description: "Alternative encoding scheme to bypass output scanning"
+
+    - pattern: "(reverse|backwards|mirror)\\s*.{0,15}(your|the|each)\\s*(response|answer|output|text|words?)"
+      severity: critical
+      category: covert_exfiltration
+      description: "Reverse output encoding to evade pattern matching"
+
+    - pattern: "(every|each)\\s*(nth|second|third|other)\\s*(letter|character|word)\\s*(spell|form|encode|contain)"
+      severity: critical
+      category: covert_exfiltration
+      description: "Character-level interleaving to hide exfiltrated data"
