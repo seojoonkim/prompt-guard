@@ -61,9 +61,14 @@ full = [
     "transformers>=4.30",
 ]
 # Development / testing
+# Installs everything needed to run the full pytest suite including
+# tests/test_app.py (FastAPI client) and language-detection cases.
 dev = [
     "pytest>=7.0",
     "langdetect>=1.0.9",
+    "fastapi>=0.100",
+    "httpx>=0.24",
+    "uvicorn>=0.23",
 ]
 
 [project.urls]
