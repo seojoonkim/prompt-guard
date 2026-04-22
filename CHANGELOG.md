@@ -2,6 +2,63 @@
 
 All notable changes to Prompt Guard will be documented in this file.
 
+## [3.7.1] - 2026-04-21
+
+### External Content Detection
+
+**Goal:** Detect instruction injection inside content that the caller has declared as coming from an untrusted external source (GitHub issues/PRs, email bodies, Slack/Discord messages, social mentions, RAG chunks, tool output). Activated through the existing `context` argument of `analyze()` — **zero cost when not used**.
+
+#### New API surface
+
+`PromptGuard.analyze(message, context=...)` now recognizes two optional context keys:
+
+| Key | Type | Purpose |
+|---|---|---|
+| `source` | `str` | One of `github_issue`, `github_pr`, `email`, `slack`, `discord`, `social`, `web`, `rag`, `tool_output` |
+| `untrusted` | `bool` | Explicit "this content is externally supplied" flag for cases that don't match a named source |
+
+```python
+guard = PromptGuard()
+guard.analyze(issue_body, context={"source": "github_issue"})
+guard.analyze(tool_result, context={"untrusted": True})
+```
+
+#### Detection behavior
+
+- When the caller declares content as untrusted, a narrow set of 10 high-signal patterns (`EXTERNAL_CONTENT_PATTERNS` in [prompt_guard/patterns.py](prompt_guard/patterns.py)) run against the original message. Hits raise severity to `CRITICAL`.
+- When the message already triggered an instruction-class reason (`instruction_override`, `role_manipulation`, `jailbreak`, `scenario_jailbreak`, `context_hijacking`, `indirect_injection`, `safety_bypass`, `guardrail_bypass`, `prompt_extraction`) **and** the context is untrusted, the severity is elevated one step (`MEDIUM → HIGH`, `HIGH → CRITICAL`), with the reason `external_elevated_risk` appended.
+- Every untrusted call is tagged with `external_source:<name>` so downstream logging and triage can filter on provenance.
+
+#### Patterns (intentionally narrow)
+
+Each pattern is bounded, MULTILINE-anchored where appropriate, and targets an injection shape distinct from the existing `CRITICAL_PATTERNS` / `INSTRUCTION_OVERRIDE` / shell categories:
+
+- Role-prefix impersonation at line start (`system:` / `assistant:` / `developer:`)
+- Bracketed urgency + destructive verb, multi-language (EN / KO / JA / ZH)
+- Bot-command syntax at line start (`!exec`, `/run`, `$shell …`)
+- "Please execute this / the following"
+- "Ignore previous instructions/rules/messages" — anchored, no greedy `.*`
+- "New/updated/real instructions:" redirection
+- Credential-exfil verb-noun adjacency (`send me the api_key`, `email the .env`)
+- "You are now X / from now on you are" role-takeover framing
+- Markdown/HTML-smuggled imperatives (`<!-- system: ... -->`)
+- Fenced-code-block directive (``` ``` ```` with an execution verb inside)
+
+#### Tests
+
+- [tests/test_external_content.py](tests/test_external_content.py) — new suite covering positive cases (across all untrusted sources), negatives (benign external content stays SAFE), 8-string developer FP regression (no-context legit strings must not fire), and back-compat with pre-v3.7.1 call sites.
+
+#### Credits
+
+This feature was prompted by a proposal in **PR #18** from **Bernardo Johnston (@profbernardoj)**. The original patch had structural issues (duplicated definitions, high false-positive rate, regex bugs, stale base) so it was not merged as-is, but the threat model is his. Closed PR: https://github.com/seojoonkim/prompt-guard/pull/18
+
+#### Files
+
+- **Added:** `tests/test_external_content.py`
+- **Modified:** `prompt_guard/patterns.py`, `prompt_guard/engine.py`, `prompt_guard/__init__.py`, `pyproject.toml`
+
+---
+
 ## [3.7.0] - 2026-03-05
 
 ### Semantic Detection Layer (LLM-as-Judge + Local Model)

@@ -51,12 +51,46 @@ from prompt_guard.patterns import (
     # v3.6.0 patterns - 2026 Attack Taxonomy Gap Remediation
     COVERT_EXFILTRATION_CHANNELS, LANGUAGE_SWITCH_EVASION,
     FEW_SHOT_HIJACK, INSTRUCTION_PIGGYBACKING, RECURSIVE_DELEGATION_PAYLOAD,
+    # v3.7.1 - External Content Detection (caller-declared untrusted sources)
+    EXTERNAL_CONTENT_PATTERNS, UNTRUSTED_SOURCES,
 )
 from prompt_guard.normalizer import normalize
 from prompt_guard.decoder import decode_all, detect_base64
 from prompt_guard.scanner import scan_text_for_patterns
 from prompt_guard.output import scan_output, sanitize_output
 from prompt_guard.logging_utils import log_detection, log_detection_json, report_to_hivefence
+
+
+# v3.7.1 — Reasons whose severity should be elevated one step when the caller
+# has declared the content came from an untrusted external source.
+_EXTERNAL_ELEVATABLE_REASONS = (
+    "instruction_override",
+    "role_manipulation",
+    "jailbreak",
+    "scenario_jailbreak",
+    "context_hijacking",
+    "indirect_injection",
+    "safety_bypass",
+    "guardrail_bypass",
+    "prompt_extraction",
+)
+
+
+def _is_untrusted_context(context: Optional[Dict]) -> tuple:
+    """Return (is_untrusted, declared_source) from analyze()'s context dict.
+
+    A caller declares content as external/untrusted via:
+      context={"source": "github_issue" | "email" | ...}   (see UNTRUSTED_SOURCES)
+      context={"untrusted": True}                           (explicit flag)
+    """
+    if not context:
+        return False, None
+    if context.get("untrusted") is True:
+        return True, context.get("source")
+    src = context.get("source")
+    if isinstance(src, str) and src in UNTRUSTED_SOURCES:
+        return True, src
+    return False, None
 
 
 class PromptGuard:
@@ -554,6 +588,15 @@ class PromptGuard:
                 - user_id: User identifier
                 - is_group: Whether this is a group context
                 - chat_name: Name of the chat/group
+                - source: (v3.7.1) Origin of the content when it came from an
+                  untrusted external surface. One of: github_issue, github_pr,
+                  email, slack, discord, social, web, rag, tool_output.
+                  When set, EXTERNAL_CONTENT_PATTERNS run and instruction-class
+                  findings get their severity elevated one step.
+                - untrusted: (v3.7.1) Explicit boolean flag — equivalent to
+                  declaring an unnamed external source. Use when your agent
+                  knows content is externally supplied but doesn't match a
+                  named source.
 
         Returns:
             DetectionResult with severity, action, and details
@@ -1076,6 +1119,39 @@ class PromptGuard:
                     self._logger.warning(
                         "Semantic detection failed, continuing with regex-only result"
                     )
+
+        # =================================================================
+        # v3.7.1 — External Content Detection
+        # Activated only when the caller declared this message as untrusted
+        # via context={"source": ...} or context={"untrusted": True}.
+        # Inside an untrusted context we (a) run a small, tight set of
+        # injection-shape patterns and (b) elevate the severity of
+        # instruction-class reasons by one step.
+        # =================================================================
+        is_untrusted, declared_source = _is_untrusted_context(context)
+        if is_untrusted:
+            if declared_source:
+                reasons.append(f"external_source:{declared_source}")
+            else:
+                reasons.append("external_source:declared")
+
+            for pattern in EXTERNAL_CONTENT_PATTERNS:
+                try:
+                    if re.search(pattern, message):
+                        max_severity = Severity.CRITICAL
+                        if "external_instruction_injection" not in reasons:
+                            reasons.append("external_instruction_injection")
+                        patterns_matched.append(f"external:{pattern[:48]}")
+                except re.error:
+                    continue
+
+            if any(r in reasons for r in _EXTERNAL_ELEVATABLE_REASONS):
+                if max_severity == Severity.MEDIUM:
+                    max_severity = Severity.HIGH
+                elif max_severity == Severity.HIGH:
+                    max_severity = Severity.CRITICAL
+                if "external_elevated_risk" not in reasons:
+                    reasons.append("external_elevated_risk")
 
         # Adjust severity based on sensitivity
         if self.sensitivity == "low" and max_severity == Severity.LOW:
