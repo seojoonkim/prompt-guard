@@ -1605,3 +1605,92 @@ RECURSIVE_DELEGATION_PAYLOAD = [
     # Numbered list with hidden payload
     r"\d+\.\s*.{0,200}\d+\.\s*.{0,50}(ignore|forget|override|bypass|reveal|show|extract)\s*.{0,30}(instruction|prompt|rule|system|password|key)",
 ]
+
+# =============================================================================
+# EXTERNAL CONTENT DETECTION (v3.7.1 - 2026-04-21)
+#
+# Activated only when the caller declares that the message content comes from
+# an untrusted external source via analyze(msg, context={"source": ...}) or
+# context={"untrusted": True}. The caller-declared signal is the trust
+# boundary; these patterns only act as severity amplifiers inside that
+# already-untrusted context.
+#
+# Patterns here are intentionally NARROW — each one targets instruction
+# injection shapes that are distinct from the general CRITICAL_PATTERNS /
+# INSTRUCTION_OVERRIDE / SHELL categories. Overlapping shell / RCE / SQL
+# payloads are intentionally NOT re-added here; they are already blocked
+# upstream and don't need to be duplicated.
+#
+# Inspired by a contribution proposal from Bernardo Johnston (@profbernardoj).
+# =============================================================================
+
+# Sources the caller may declare as untrusted. Kept as a set for O(1) lookup.
+UNTRUSTED_SOURCES = frozenset({
+    "github_issue",
+    "github_pr",
+    "email",
+    "slack",
+    "discord",
+    "social",
+    "web",
+    "rag",
+    "tool_output",
+})
+
+# Narrow, high-signal patterns that specifically indicate instruction injection
+# *inside* content already known to be external. Each pattern is justified by
+# a test case in tests/test_external_content.py.
+EXTERNAL_CONTENT_PATTERNS = [
+    # Role-prefix impersonation at a line start — "System: ...", "Assistant: ..."
+    # Requires MULTILINE to anchor per-line inside a multi-line external blob.
+    r"(?im)^\s*(system|assistant|developer)\s*:\s*\S",
+
+    # Bracketed urgency + destructive verb (multi-language). Caps the gap to
+    # 60 chars so it doesn't span paragraphs.
+    r"(?im)\[\s*(urgent|critical|emergency|asap|immediate|action\s*required|긴급|즉시|중요|緊急|至急|紧急|立即|重要)\s*\]\s*.{0,60}?\b("
+    r"execute|run|eval|delete|drop|transfer|wire|send|share|reveal|exfiltrate|"
+    r"실행|삭제|전송|공유|"
+    r"実行|削除|送信|共有|"
+    r"执行|删除|发送|分享"
+    r")\b",
+
+    # Bot-command syntax at line start — "!run ...", "/exec ...", "$shell ..."
+    # Only matches at the start of a line so it doesn't fire on "Use the !run flag".
+    r"(?im)^\s*[!/$][a-z_][a-z0-9_]{1,30}\s+\S",
+
+    # "Please execute this / run the following" — tight, verb-bounded variant
+    # of the overly-broad "please run X" pattern from the original proposal.
+    r"(?i)\b(please|pls|kindly)\s+(execute|run|eval|evaluate)\s+(this|the\s+following|these)\b",
+
+    # Anchored "ignore previous instructions" family — bounded (no greedy .*).
+    # Complementary to INSTRUCTION_OVERRIDE but tuned for external content
+    # framing ("messages" / "guidelines" / "rules").
+    r"(?i)\b(ignore|disregard|forget|override)\s+(all\s+|the\s+|your\s+)?"
+    r"(previous|above|prior|earlier|original)\s+"
+    r"(instructions?|rules?|messages?|guidelines?|constraints?|system\s*prompt)\b",
+
+    # "New/real/updated instructions:" redirection — colon-anchored so it
+    # doesn't fire on narrative prose.
+    r"(?i)\b(new|updated|real|actual|override|corrected|final)\s+"
+    r"(instructions?|rules?|guidelines?|system\s*prompt|directives?)\s*[:\-–]",
+
+    # Credential-exfil framing that's unusual in legitimate external content.
+    # Requires verb-noun adjacency so plain "api key" mentions don't fire.
+    r"(?i)\b(send|post|share|reveal|email|forward|transfer|exfiltrate|leak)\b"
+    r"\s+(me\s+|us\s+)?(the\s+|your\s+|all\s+)?"
+    r"(api[_-]?key|access[_-]?token|bearer[_-]?token|secret|credentials?|"
+    r"password|\.env(?:\s+file)?|private[_-]?key|service[_-]?account)",
+
+    # "You are now X / from now on you are" role takeover framing.
+    r"(?i)\b(you\s+are\s+now|from\s+now\s+on(?:,|\s+)\s*you(?:\s+are|'re))\s+"
+    r"(a\s+|an\s+|the\s+)?[a-z][a-z\s]{2,40}(bot|assistant|ai|model|persona|character|dan|jailbroken)\b",
+
+    # Markdown/HTML-smuggled imperative — "<!-- system: ... -->" style.
+    r"(?is)<!--\s*(system|assistant|instruction|override|ignore)\b.{0,200}?-->",
+
+    # Fenced-code-block with an execution directive inside. External sources
+    # (issues/PRs) often use fences; we only care when the fence content
+    # itself names an execution verb the caller is expected to perform.
+    r"(?is)```[a-z0-9_-]{0,20}\s*\n?\s*(execute|run|eval|sudo|exec)\s+",
+]
+
