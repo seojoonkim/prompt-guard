@@ -640,8 +640,20 @@ class TestJsonLogging(unittest.TestCase):
 # =============================================================================
 
 
+try:
+    import langdetect  # noqa: F401
+    HAS_LANGDETECT = True
+except ImportError:
+    HAS_LANGDETECT = False
+
+
 class TestLanguageDetection(unittest.TestCase):
-    """Test language detection and unsupported language flagging."""
+    """Test language detection and unsupported language flagging.
+
+    Some cases require the optional `langdetect` dependency. Install it via:
+        pip install 'prompt-guard[lang]'   (or the `dev` extra)
+    When absent, those cases are skipped rather than failed.
+    """
 
     def setUp(self):
         self.guard = make_guard()
@@ -656,6 +668,7 @@ class TestLanguageDetection(unittest.TestCase):
         unsupported = [r for r in result.reasons if "unsupported_language" in r]
         self.assertEqual(len(unsupported), 0)
 
+    @unittest.skipUnless(HAS_LANGDETECT, "requires langdetect (install: pip install 'prompt-guard[lang]')")
     def test_unsupported_language_flagged(self):
         """Unsupported language should be flagged at MEDIUM."""
         # Swahili text
@@ -666,6 +679,7 @@ class TestLanguageDetection(unittest.TestCase):
         self.assertTrue(len(unsupported) > 0)
         self.assertGreaterEqual(result.severity.value, Severity.MEDIUM.value)
 
+    @unittest.skipUnless(HAS_LANGDETECT, "requires langdetect (install: pip install 'prompt-guard[lang]')")
     def test_detect_language_returns_code(self):
         lang = self.guard.detect_language("This is an English sentence with enough words.")
         self.assertEqual(lang, "en")
