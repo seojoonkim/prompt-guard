@@ -18,7 +18,7 @@ from typing import Optional, Dict, List, Any
 from prompt_guard.models import Severity, Action, DetectionResult, SanitizeResult
 from prompt_guard.cache import get_cache, MessageCache
 
-__version__ = "3.6.0"
+__version__ = "3.7.1"
 from prompt_guard.pattern_loader import TieredPatternLoader, LoadTier, get_loader
 from prompt_guard.patterns import (
     CRITICAL_PATTERNS,
