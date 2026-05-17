@@ -1102,6 +1102,64 @@ PATTERNS_VI = {
     ],
 }
 
+# Azerbaijani patterns (Azərbaycan) - v3.7.2
+PATTERNS_AZ = {
+    "instruction_override": [
+        r"(əvvəlki|köhnə|keçmiş)\s*(göstərişləri?|təlimatları?|əmrleri?|qaydaları?)\s*(ignore\s*et|yaddan\s*çıxar|unut|nəzərə\s*alma|ləğv\s*et)",
+        r"yeni\s*(göstərişlə?r?|təlimatlar?)\s*[:：]",
+        r"bütün\s*qaydaları\s*unut",
+        r"(sən|siz)\s*(indi|artıq)\s*(başqa|digər)\s*.{0,20}(AI|süni\s*intellekt)",
+        r"sistem\s*promptunu\s*göstər",
+    ],
+    "role_manipulation": [
+        r"(sən|siz)\s*(indi|artıq)\s*.{1,80}",
+        r".{1,80}kimi\s*davran",
+        r".{1,80}rolunu?\s*oyna",
+        r"(təsəvvür\s*et|fərz\s*et)\s*.+olduğunu",
+    ],
+    "jailbreak": [
+        r"(məhdudiyyət|qadağa|məhdudlaşdırma|filtr)\s*(olmadan|yoxdur|çıxar|aradan\s*qaldır)",
+        r"(jailbreak|həbsdən\s*qaçış)",
+        r"məhdudiyyətsiz\s*mod",
+        r"oyun\s*oynayaq.{0,20}(hər\s*şeyə\s*razısan|razılaş)",
+    ],
+    "data_exfiltration": [
+        r"(parol|token|açar|gizli|API|api)\s*(göstər|ver|de|bildir)",
+        r"sistem\s*(promptunu?|əmrini?)\s*(göstər|ver)",
+        r"gizli\s*məlumatı?\s*aç",
+        r"API\s*açarını?\s*göstər",
+    ],
+}
+
+# Turkish patterns (Türkçe) - v3.7.2
+PATTERNS_TR = {
+    "instruction_override": [
+        r"(önceki|geçmiş|eski)\s*(talimatları?|komutları?|kuralları?)\s*(yok\s*say|unut|görmezden\s*gel|iptal\s*et)",
+        r"yeni\s*(talimatlar?|komutlar?)\s*[:：]",
+        r"tüm\s*kuralları?\s*unut",
+        r"(sen|siz)\s*(artık|şimdi)\s*(başka|diğer)\s*.{0,20}(AI|yapay\s*zeka)",
+        r"sistem\s*promptunu\s*göster",
+    ],
+    "role_manipulation": [
+        r"(sen|siz)\s*(artık|şimdi)\s*.{1,80}",
+        r".{1,80}gibi\s*davran",
+        r".{1,80}rolünü?\s*oyna",
+        r"(hayal\s*et|varsay|farz\s*et)\s*.+olduğunu",
+    ],
+    "jailbreak": [
+        r"(kısıtlama|sınırlama|filtre|kural)\s*(olmadan|yok|kaldır|devre\s*dışı)",
+        r"(jailbreak|hapisten\s*kaçış)",
+        r"sınırsız\s*mod",
+        r"oyun\s*oynayalım.{0,20}(her\s*şeye\s*razısın|kabul)",
+    ],
+    "data_exfiltration": [
+        r"(şifre|parola|token|anahtar|gizli|API|api)\s*(göster|ver|söyle|bildir)",
+        r"sistem\s*(promptunu?|komutunu?)\s*(göster|ver)",
+        r"gizli\s*bilgiyi?\s*aç",
+        r"API\s*anahtarını?\s*göster",
+    ],
+}
+
 # Critical patterns - immediate block
 CRITICAL_PATTERNS = [
     r"execute\s+.{0,30}\s+without\s+(asking|confirmation|consent)",
@@ -1152,6 +1210,14 @@ SECRET_PATTERNS = {
         r"(令牌|密钥|密码|秘密|API).{0,15}(显示|告诉|输出|给我)",
         r"(配置|设置|环境变量).{0,15}(显示|告诉|输出)",
         r"(秘密|密钥).{0,10}(什么|告诉)",
+    ],
+    "az": [
+        r"(göstər|ver|de|bildir)\s*.{0,15}(api|token|açar|parol|gizli|şifrə)",
+        r"(sistem|prompt|konfiq|config).{0,15}(göstər|ver|oxu|aç)",
+    ],
+    "tr": [
+        r"(göster|ver|söyle|bildir)\s*.{0,15}(api|token|anahtar|parola|gizli|şifre)",
+        r"(sistem|prompt|konfig|config|yapılandırma).{0,15}(göster|ver|oku|aç)",
     ],
 }
 

@@ -68,6 +68,38 @@ patterns:
       category: role_manipulation
       lang: zh
 
+    # Azerbaijani
+    - pattern: "(sən|siz)\\s*(indi|artıq)\\s*.{1,80}"
+      severity: medium
+      category: role_manipulation
+      lang: az
+
+    - pattern: ".{1,80}kimi\\s*davran"
+      severity: medium
+      category: role_manipulation
+      lang: az
+
+    - pattern: ".{1,80}rolunu?\\s*oyna"
+      severity: medium
+      category: role_manipulation
+      lang: az
+
+    # Turkish
+    - pattern: "(sen|siz)\\s*(artık|şimdi)\\s*.{1,80}"
+      severity: medium
+      category: role_manipulation
+      lang: tr
+
+    - pattern: ".{1,80}gibi\\s*davran"
+      severity: medium
+      category: role_manipulation
+      lang: tr
+
+    - pattern: ".{1,80}rolünü?\\s*oyna"
+      severity: medium
+      category: role_manipulation
+      lang: tr
+
   # Authority Impersonation
   authority_impersonation:
     - pattern: "i\\s+am\\s+(the\\s+)?(admin|administrator|owner|developer|creator|maintainer)"
@@ -95,6 +127,12 @@ patterns:
       severity: medium
       category: authority_impersonation
       lang: ko
+
+    # Azerbaijani
+    - pattern: "(mən|mənəm)\\s*(admin|administrator|sahib|yaradıcı|developer)"
+      severity: medium
+      category: authority_impersonation
+      lang: az
 
   # Context Hijacking
   context_hijacking:

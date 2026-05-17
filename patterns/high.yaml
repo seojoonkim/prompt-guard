@@ -43,6 +43,38 @@ patterns:
       category: instruction_override
       lang: zh
 
+    # Azerbaijani
+    - pattern: "(əvvəlki|köhnə|keçmiş)\\s*(göstərişləri?|təlimatları?|əmrleri?|qaydaları?)\\s*(ignore\\s*et|yaddan\\s*çıxar|unut|nəzərə\\s*alma|ləğv\\s*et)"
+      severity: high
+      category: instruction_override
+      lang: az
+
+    - pattern: "yeni\\s*göstərişlə?r?\\s*[:：]"
+      severity: high
+      category: instruction_override
+      lang: az
+
+    - pattern: "bütün\\s*qaydaları\\s*unut"
+      severity: high
+      category: instruction_override
+      lang: az
+
+    # Turkish
+    - pattern: "(önceki|geçmiş|eski)\\s*(talimatları?|komutları?|kuralları?)\\s*(yok\\s*say|unut|görmezden\\s*gel|iptal\\s*et)"
+      severity: high
+      category: instruction_override
+      lang: tr
+
+    - pattern: "yeni\\s*talimatlar?\\s*[:：]"
+      severity: high
+      category: instruction_override
+      lang: tr
+
+    - pattern: "tüm\\s*kuralları?\\s*unut"
+      severity: high
+      category: instruction_override
+      lang: tr
+
   # Jailbreak Attempts
   jailbreak:
     - pattern: "jailbreak"
