@@ -25,7 +25,7 @@ from prompt_guard.patterns import (
     SECRET_PATTERNS,
     PATTERNS_EN, PATTERNS_KO, PATTERNS_JA, PATTERNS_ZH,
     PATTERNS_RU, PATTERNS_ES, PATTERNS_DE, PATTERNS_FR,
-    PATTERNS_PT, PATTERNS_VI,
+    PATTERNS_PT, PATTERNS_VI, PATTERNS_AZ, PATTERNS_TR,
     SCENARIO_JAILBREAK, EMOTIONAL_MANIPULATION, AUTHORITY_RECON,
     COGNITIVE_MANIPULATION, PHISHING_SOCIAL_ENG, REPETITION_ATTACK,
     SYSTEM_FILE_ACCESS, MALWARE_DESCRIPTION,
@@ -356,7 +356,12 @@ class PromptGuard:
         except Exception:
             return None
 
-    SUPPORTED_LANGUAGES = {"en", "ko", "ja", "zh-cn", "zh-tw", "zh", "ru", "es", "de", "fr", "pt", "vi"}
+    SUPPORTED_LANGUAGES = {
+        "en", "ko", "ja", "zh-cn", "zh-tw", "zh",
+        "ru", "es", "de", "fr", "pt", "vi",
+        "tr",   # also covers Azerbaijani (langdetect returns "tr" for "az")
+        "az",   # reserved: langdetect cannot distinguish az from tr currently
+    }
 
     def decode_all(self, text: str) -> List[Dict[str, str]]:
         """Attempt to decode encoded content in the message using multiple encodings."""
@@ -1000,6 +1005,8 @@ class PromptGuard:
             (PATTERNS_FR, "fr"),
             (PATTERNS_PT, "pt"),
             (PATTERNS_VI, "vi"),
+            (PATTERNS_AZ, "az"),
+            (PATTERNS_TR, "tr"),
         ]
 
         severity_map = {

@@ -18,7 +18,7 @@ from prompt_guard.patterns import (
     SECRET_PATTERNS,
     PATTERNS_EN, PATTERNS_KO, PATTERNS_JA, PATTERNS_ZH,
     PATTERNS_RU, PATTERNS_ES, PATTERNS_DE, PATTERNS_FR,
-    PATTERNS_PT, PATTERNS_VI,
+    PATTERNS_PT, PATTERNS_VI, PATTERNS_AZ, PATTERNS_TR,
     SCENARIO_JAILBREAK, EMOTIONAL_MANIPULATION, AUTHORITY_RECON,
     COGNITIVE_MANIPULATION, PHISHING_SOCIAL_ENG, SYSTEM_FILE_ACCESS,
     MALWARE_DESCRIPTION, INDIRECT_INJECTION, CONTEXT_HIJACKING,
@@ -90,7 +90,7 @@ def scan_text_for_patterns(text: str) -> Tuple[List[str], List[str], Severity]:
         (PATTERNS_EN, "en"), (PATTERNS_KO, "ko"), (PATTERNS_JA, "ja"),
         (PATTERNS_ZH, "zh"), (PATTERNS_RU, "ru"), (PATTERNS_ES, "es"),
         (PATTERNS_DE, "de"), (PATTERNS_FR, "fr"), (PATTERNS_PT, "pt"),
-        (PATTERNS_VI, "vi"),
+        (PATTERNS_VI, "vi"), (PATTERNS_AZ, "az"), (PATTERNS_TR, "tr"),
     ]
     severity_map = {
         "instruction_override": Severity.HIGH,
