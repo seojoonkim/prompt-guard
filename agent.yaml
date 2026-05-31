@@ -1,0 +1,37 @@
+spec_version: "0.1.0"
+name: prompt-guard
+version: 3.7.0
+description: >
+  Advanced AI agent runtime security library that defends against prompt injection,
+  jailbreak attempts, supply chain attacks, memory poisoning, unicode steganography,
+  action gate bypass, and cascade amplification. Ships 840+ regex patterns across
+  critical/high/medium tiers in 10 languages, an optional LLM-as-Judge semantic
+  detection layer, output DLP, and a tiered pattern loader with LRU caching for
+  90% token savings. Works 100% offline; optional API for early-access patterns.
+  Drop-in middleware for any LLM-powered system — LangChain, AutoGPT, CrewAI,
+  Claude Code, or any custom agent runtime.
+author: seojoonkim
+license: MIT
+
+model:
+  preferred: anthropic:claude-sonnet-4-6
+  constraints:
+    temperature: 0.0
+    max_tokens: 2048
+
+skills:
+  - prompt-guard
+
+runtime:
+  max_turns: 1
+  timeout: 30
+
+compliance:
+  risk_tier: standard
+  supervision:
+    human_in_the_loop: destructive
+    kill_switch: true
+  recordkeeping:
+    audit_logging: true
+  data_governance:
+    pii_handling: redact
